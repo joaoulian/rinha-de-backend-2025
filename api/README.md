@@ -1,4 +1,4 @@
-# Calhamaco API
+# Rinha de Backend 2025 API
 
 A modern Node.js API built with Fastify, TypeScript, and dependency injection using Awilix.
 
@@ -21,16 +21,19 @@ A modern Node.js API built with Fastify, TypeScript, and dependency injection us
 ### Installation
 
 1. Install dependencies:
+
 ```bash
 pnpm install
 ```
 
 2. Copy environment variables:
+
 ```bash
 cp .env.example .env
 ```
 
 3. Start the development server:
+
 ```bash
 pnpm dev
 ```
@@ -53,15 +56,13 @@ The API will be available at `http://localhost:3000`
 ## API Endpoints
 
 ### Health Check
-- `GET /health` - Basic health check
-- `GET /health/detailed` - Detailed health check with dependencies
 
-### Users
-- `GET /users` - Get all users
-- `GET /users/:id` - Get user by ID
-- `POST /users` - Create new user
-- `PUT /users/:id` - Update user
-- `DELETE /users/:id` - Delete user
+- `GET /health` - Basic health check
+
+### Payments
+
+- `POST /payments` - Process payment
+- `GET /payments-summary` - Get payments summary
 
 ## Project Structure
 
@@ -95,6 +96,7 @@ The project includes comprehensive testing setup:
 - **Coverage Reports**: Generated with Jest
 
 Run tests:
+
 ```bash
 # Run all tests
 pnpm test
