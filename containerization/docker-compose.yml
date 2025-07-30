@@ -1,11 +1,11 @@
 services:
-  broker:
-    image: rabbitmq:3-management
+  redis:
+    image: redis:7-alpine
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "6379:6379"
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - redis_data:/data
+    command: redis-server --appendonly yes
 
 volumes:
-  rabbitmq_data:
+  redis_data:

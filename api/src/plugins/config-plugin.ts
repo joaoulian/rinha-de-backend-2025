@@ -14,6 +14,7 @@ const environmentConfigSchema = z.object({
   PROCESSOR_DEFAULT_URL: z.string().default("http://localhost:8001"),
   PROCESSOR_FALLBACK_URL: z.string().default("http://localhost:8002"),
   RABBITMQ_URL: z.string().default("amqp://localhost:5672"),
+  REDIS_URL: z.string().default("redis://localhost:6379"),
 });
 
 // Load environment variables

@@ -2,7 +2,7 @@ import type { FastifyPluginCallback } from "fastify";
 import fp from "fastify-plugin";
 import z from "zod";
 import { PaymentProcessorGateway } from "./gateways/payment-processor-gateway";
-import { RabbitMQClient } from "./messaging/rabbitmq-client";
+import { paymentProcessingExample } from "./examples/bullmq-usage.example";
 
 const routes: FastifyPluginCallback = (fastify, _options, done) => {
   fastify.route<{ Body: { correlationId: string; amount: number } }>({
@@ -10,7 +10,7 @@ const routes: FastifyPluginCallback = (fastify, _options, done) => {
     url: "/payments",
     schema: {
       body: z.object({
-        correlationId: z.string(),
+        // correlationId: z.uuidv4(),
         amount: z.coerce.number(),
       }),
       response: {
@@ -26,14 +26,7 @@ const routes: FastifyPluginCallback = (fastify, _options, done) => {
       const healthStatus = await paymentProcessorGateway.checkHealth(
         "fallback"
       );
-      const rabbitMQClient =
-        fastify.diContainer.resolve<RabbitMQClient>("rabbitMQClient");
-
-      await rabbitMQClient.publishPayment({
-        correlationId,
-        amount,
-        requestedAt: new Date(),
-      });
+      const example = await paymentProcessingExample(fastify);
       fastify.log.info({ healthStatus });
       return reply.status(200).send();
     },

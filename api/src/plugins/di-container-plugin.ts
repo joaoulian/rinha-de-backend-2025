@@ -7,15 +7,17 @@ import { diContainer, fastifyAwilixPlugin } from "@fastify/awilix";
 import { asClass, asValue } from "awilix";
 import fp from "fastify-plugin";
 import { PaymentProcessorGateway } from "../gateways/payment-processor-gateway";
-import { RabbitMQClient } from "../messaging/rabbitmq-client";
 import { AppConfig } from "./config-plugin";
+import { BullMQWrapper } from "../queues/bullmq-wrapper";
+import { PaymentQueueService } from "../services/payment-queue.service";
 
 declare module "@fastify/awilix" {
   interface Cradle {
     appConfig: AppConfig;
     logger: FastifyBaseLogger;
     paymentProcessorGateway: PaymentProcessorGateway;
-    rabbitMQClient: RabbitMQClient;
+    bullMQWrapper: BullMQWrapper;
+    paymentQueueService: PaymentQueueService;
   }
 }
 
@@ -30,7 +32,8 @@ const diContainerPlugin: FastifyPluginAsync = async (
     appConfig: asValue(fastify.appConfig),
     logger: asValue(fastify.log),
     paymentProcessorGateway: asClass(PaymentProcessorGateway).singleton(),
-    rabbitMQClient: asClass(RabbitMQClient).singleton(),
+    bullMQWrapper: asClass(BullMQWrapper).singleton(),
+    paymentQueueService: asClass(PaymentQueueService).singleton(),
   });
 };
 
