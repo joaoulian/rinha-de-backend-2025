@@ -39,11 +39,18 @@ export class PaymentProcessorGateway {
       );
       await axios.post<ProcessPaymentInput>(
         this.getHostUrl(host) + "/payments",
-        input
+        {
+          amount: input.amount,
+          correlationId: input.correlationId,
+          requestedAt: input.requestedAt.toISOString(),
+        }
       );
       return;
-    } catch (e) {
-      this.logger.error(`Error in ${host} payment processor`);
+    } catch (e: any) {
+      this.logger.error(
+        { error: e.message },
+        `Error in ${host} payment processor`
+      );
       throw e;
     }
   }
@@ -58,8 +65,11 @@ export class PaymentProcessorGateway {
         minResponseTime: number;
       }>(this.getHostUrl(host) + "/payments/service-health");
       return response.data;
-    } catch (e) {
-      this.logger.error({ error: e }, `Error in ${host} payment processor`);
+    } catch (e: any) {
+      this.logger.error(
+        { error: e.message },
+        `Error in ${host} payment processor`
+      );
       throw e;
     }
   }
