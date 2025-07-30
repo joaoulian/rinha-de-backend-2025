@@ -1,9 +1,16 @@
-import { AppManager } from "./app";
+import { AppBuilder } from "./app-builder";
 
 async function start() {
   try {
-    const appManager = new AppManager();
-    await appManager.start();
+    const appManager = new AppBuilder();
+    const app = await appManager.build();
+    const appConfig = app.diContainer.resolve("appConfig");
+    await app.listen({
+      host: "0.0.0.0",
+      port: app.appConfig.PORT,
+    });
+    app.log.info(`🚀 Server running on http://localhost:${appConfig.PORT}`);
+    app.log.info(`📝 Environment: ${appConfig.NODE_ENV}`);
   } catch (error) {
     console.error("❌ Error starting server:", error);
     process.exit(1);

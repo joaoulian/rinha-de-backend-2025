@@ -1,6 +1,6 @@
 import axios from "axios";
 import type { FastifyBaseLogger } from "fastify";
-import type { Config } from "../config";
+import type { AppConfig } from "../plugins/config-plugin";
 
 export type ProcessPaymentInput = {
   amount: number;
@@ -12,7 +12,7 @@ export type Host = "default" | "fallback";
 
 export interface PaymentProcessorGatewayDeps {
   logger: FastifyBaseLogger;
-  config: Config;
+  appConfig: AppConfig;
 }
 
 export class PaymentProcessorGateway {
@@ -23,8 +23,8 @@ export class PaymentProcessorGateway {
 
   constructor(deps: PaymentProcessorGatewayDeps) {
     this.serverUrls = {
-      ["default"]: deps.config.processorDefaultUrl,
-      ["fallback"]: deps.config.processorFallbackUrl,
+      ["default"]: deps.appConfig.PROCESSOR_DEFAULT_URL,
+      ["fallback"]: deps.appConfig.PROCESSOR_FALLBACK_URL,
     };
     this.logger = deps.logger;
   }

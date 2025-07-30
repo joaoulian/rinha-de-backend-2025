@@ -1,37 +1,24 @@
-import type { FastifyInstance, FastifyPluginOptions } from "fastify";
+import type { FastifyPluginCallback } from "fastify";
+import fp from "fastify-plugin";
 import z from "zod";
-import { HealthService } from "./services/health.service";
-import {
-  Host,
-  PaymentProcessorGateway,
-} from "./gateways/payment-processor-gateway";
+import { PaymentProcessorGateway } from "./gateways/payment-processor-gateway";
+import { RabbitMQClient } from "./messaging/rabbitmq-client";
 
-export async function routes(
-  fastify: FastifyInstance,
-  _options: FastifyPluginOptions
-): Promise<void> {
-  // Health check endpoint
-  fastify.get("/", async (_request, reply) => {
-    const healthService =
-      fastify.diContainer.resolve<HealthService>("healthService");
-    const healthStatus = healthService.getHealthStatus();
-    return reply.status(200).send(healthStatus);
-  });
-
-  fastify.post(
-    "/payments",
-    {
-      schema: {
-        body: z.object({
-          correlationId: z.string(),
-          amount: z.coerce.number(),
-        }),
-        response: {
-          200: z.void(),
-        },
+const routes: FastifyPluginCallback = (fastify, _options, done) => {
+  fastify.route<{ Body: { correlationId: string; amount: number } }>({
+    method: "POST",
+    url: "/payments",
+    schema: {
+      body: z.object({
+        correlationId: z.string(),
+        amount: z.coerce.number(),
+      }),
+      response: {
+        200: z.void(),
       },
     },
-    async (_request, reply) => {
+    handler: async function (request, reply) {
+      const { correlationId, amount } = request.body;
       const paymentProcessorGateway =
         fastify.diContainer.resolve<PaymentProcessorGateway>(
           "paymentProcessorGateway"
@@ -39,34 +26,41 @@ export async function routes(
       const healthStatus = await paymentProcessorGateway.checkHealth(
         "fallback"
       );
+      const rabbitMQClient =
+        fastify.diContainer.resolve<RabbitMQClient>("rabbitMQClient");
+
+      await rabbitMQClient.publishPayment({
+        correlationId,
+        amount,
+        requestedAt: new Date(),
+      });
       fastify.log.info({ healthStatus });
       return reply.status(200).send();
-    }
-  );
+    },
+  });
 
-  fastify.get(
-    "/payments-summary",
-    {
-      schema: {
-        query: z.object({
-          from: z.string().optional(),
-          to: z.string().optional(),
-        }),
-        response: {
-          200: z.object({
-            default: z.object({
-              totalRequests: z.number(),
-              totalAmount: z.number(),
-            }),
-            fallback: z.object({
-              totalRequests: z.number(),
-              totalAmount: z.number(),
-            }),
+  fastify.route({
+    method: "GET",
+    url: "/payments-summary",
+    schema: {
+      query: z.object({
+        from: z.string().optional(),
+        to: z.string().optional(),
+      }),
+      response: {
+        200: z.object({
+          default: z.object({
+            totalRequests: z.number(),
+            totalAmount: z.number(),
           }),
-        },
+          fallback: z.object({
+            totalRequests: z.number(),
+            totalAmount: z.number(),
+          }),
+        }),
       },
     },
-    async (_request, reply) => {
+    handler: async function (request, reply) {
       return reply.status(200).send({
         default: {
           totalRequests: 0,
@@ -77,6 +71,10 @@ export async function routes(
           totalAmount: 0,
         },
       });
-    }
-  );
-}
+    },
+  });
+
+  done();
+};
+
+export default fp(routes);
