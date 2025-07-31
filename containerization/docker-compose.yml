@@ -1,4 +1,28 @@
 services:
+  database:
+    image: postgres:alpine
+    ports:
+      - "5482:5432"
+    environment:
+      - POSTGRES_USER=docker
+      - POSTGRES_PASSWORD=docker
+      - POSTGRES_DB=rinha_de_backend_2025
+    volumes:
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docker -d rinha_de_backend_2025"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "0.05"
+          memory: "70MB"
+
   cache:
     image: redis:7-alpine
     ports:
@@ -47,11 +71,15 @@ services:
       - PROCESSOR_DEFAULT_URL=http://payment-processor-default:8080
       - PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
       - REDIS_URL=redis://cache:6379
+      - DATABASE_URL=postgresql://docker:docker@database:5432/rinha_de_backend_2025
     networks:
       - backend
       - payment-processor
     depends_on:
-      cache: { condition: service_healthy }
+      database:
+        condition: service_healthy
+      cache:
+        condition: service_started
 
   api2:
     <<: *api
@@ -59,6 +87,7 @@ services:
 
 volumes:
   redis_data:
+  database_data:
 
 networks:
   backend:
