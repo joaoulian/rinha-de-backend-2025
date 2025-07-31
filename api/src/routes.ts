@@ -1,8 +1,6 @@
 import type { FastifyPluginCallback } from "fastify";
 import fp from "fastify-plugin";
 import z from "zod";
-import { PaymentProcessorGateway } from "./gateways/payment-processor-gateway";
-import { paymentProcessingExample } from "./examples/bullmq-usage.example";
 
 const routes: FastifyPluginCallback = (fastify, _options, done) => {
   fastify.route<{ Body: { correlationId: string; amount: number } }>({
@@ -10,7 +8,7 @@ const routes: FastifyPluginCallback = (fastify, _options, done) => {
     url: "/payments",
     schema: {
       body: z.object({
-        // correlationId: z.uuidv4(),
+        correlationId: z.uuidv4(),
         amount: z.coerce.number(),
       }),
       response: {
@@ -19,15 +17,15 @@ const routes: FastifyPluginCallback = (fastify, _options, done) => {
     },
     handler: async function (request, reply) {
       const { correlationId, amount } = request.body;
-      const paymentProcessorGateway =
-        fastify.diContainer.resolve<PaymentProcessorGateway>(
-          "paymentProcessorGateway"
-        );
-      const healthStatus = await paymentProcessorGateway.checkHealth(
-        "fallback"
+      const paymentQueueService = fastify.diContainer.resolve(
+        "paymentQueueService"
       );
-      const example = await paymentProcessingExample(fastify);
-      fastify.log.info({ healthStatus });
+      await paymentQueueService.queuePayment({
+        correlationId,
+        amount,
+        requestedAt: new Date(),
+        preferredHost: "default",
+      });
       return reply.status(200).send();
     },
   });
