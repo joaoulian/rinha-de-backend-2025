@@ -33,8 +33,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.05"
-          memory: "15MB"
+          cpus: "0.15"
+          memory: "42MB"
 
   api1: &api
     build:
