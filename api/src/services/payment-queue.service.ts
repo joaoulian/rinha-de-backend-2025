@@ -4,8 +4,8 @@ import { BullMQWrapper } from "../queues/bullmq-wrapper";
 import {
   PaymentProcessorGateway,
   Host,
-  ProcessPaymentInput,
 } from "../gateways/payment-processor-gateway";
+import { PaymentRepository } from "../db/repositories/payment.repository";
 
 export interface PaymentJobData {
   correlationId: string;
@@ -18,13 +18,15 @@ export interface PaymentJobData {
 export interface PaymentQueueServiceDeps {
   bullMQWrapper: BullMQWrapper;
   paymentProcessorGateway: PaymentProcessorGateway;
+  paymentRepository: PaymentRepository;
   logger: FastifyBaseLogger;
 }
 
 export class PaymentQueueService {
-  private readonly bullMQWrapper: BullMQWrapper;
-  private readonly paymentProcessorGateway: PaymentProcessorGateway;
-  private readonly logger: FastifyBaseLogger;
+  private readonly bullMQWrapper: PaymentQueueServiceDeps["bullMQWrapper"];
+  private readonly paymentProcessorGateway: PaymentQueueServiceDeps["paymentProcessorGateway"];
+  private readonly logger: PaymentQueueServiceDeps["logger"];
+  private readonly paymentRepository: PaymentQueueServiceDeps["paymentRepository"];
 
   private readonly PAYMENT_QUEUE = "payments";
   private readonly PAYMENT_JOB = "process-payment";
@@ -35,6 +37,7 @@ export class PaymentQueueService {
     this.bullMQWrapper = deps.bullMQWrapper;
     this.paymentProcessorGateway = deps.paymentProcessorGateway;
     this.logger = deps.logger;
+    this.paymentRepository = deps.paymentRepository;
     this.setupWorkers();
   }
 
@@ -88,7 +91,6 @@ export class PaymentQueueService {
         },
         preferredHost
       );
-
       this.logger.info(
         { jobId: job.id, correlationId, host: preferredHost },
         "Payment processed successfully"
@@ -121,6 +123,10 @@ export class PaymentQueueService {
       // If both hosts failed or max retries reached, throw error to trigger BullMQ retry mechanism
       throw error;
     }
+    await this.paymentRepository.updatePaymentProcessor(
+      correlationId,
+      preferredHost
+    );
   }
 
   /**

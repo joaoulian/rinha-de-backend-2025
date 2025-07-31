@@ -20,17 +20,29 @@ const routes: FastifyPluginCallback = (fastify, _options, done) => {
       const paymentQueueService = fastify.diContainer.resolve(
         "paymentQueueService"
       );
+      const paymentRepository =
+        fastify.diContainer.resolve("paymentRepository");
+
+      // Create payment record in database
+      await paymentRepository.createPayment({
+        correlationId,
+        amountInCents: amount * 100, // Convert to cents
+        requestedAt: new Date(),
+      });
+
+      // Queue payment for processing
       await paymentQueueService.queuePayment({
         correlationId,
         amount,
         requestedAt: new Date(),
         preferredHost: "default",
       });
+
       return reply.status(200).send();
     },
   });
 
-  fastify.route({
+  fastify.route<{ Querystring: { from?: string; to?: string } }>({
     method: "GET",
     url: "/payments-summary",
     schema: {
@@ -52,14 +64,25 @@ const routes: FastifyPluginCallback = (fastify, _options, done) => {
       },
     },
     handler: async function (request, reply) {
+      const { from, to } = request.query;
+      const paymentRepository =
+        fastify.diContainer.resolve("paymentRepository");
+      const query = {
+        from: from ? new Date(from) : undefined,
+        to: to ? new Date(to) : undefined,
+      };
+      const [defaultSummary, fallbackSummary] = await Promise.all([
+        paymentRepository.getPaymentSummaryByProcessor("default", query),
+        paymentRepository.getPaymentSummaryByProcessor("fallback", query),
+      ]);
       return reply.status(200).send({
         default: {
-          totalRequests: 0,
-          totalAmount: 0,
+          totalRequests: defaultSummary.totalRequests,
+          totalAmount: defaultSummary.totalAmount / 100, // Convert from cents
         },
         fallback: {
-          totalRequests: 0,
-          totalAmount: 0,
+          totalRequests: fallbackSummary.totalRequests,
+          totalAmount: fallbackSummary.totalAmount / 100, // Convert from cents
         },
       });
     },

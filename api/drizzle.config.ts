@@ -8,17 +8,17 @@ dotenv.config();
 if (process.env.NODE_ENV === "local") {
   dotenv.config({ path: ".env.local", override: true });
 }
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL must be configured.");
+}
 
 export default defineConfig({
-  schema: "./src/db/schema/index.ts",
-  out: "./src/db/migrations",
   dialect: "postgresql",
   dbCredentials: {
-    url:
-      process.env.DATABASE_URL ||
-      "postgresql://docker:docker@localhost:5432/rinha_de_backend_2025",
+    url: process.env.DATABASE_URL,
   },
+  schema: "./src/db/schema/*",
+  out: "./src/db/migrations",
   verbose: true,
-  strict: true,
   casing: "snake_case",
 });

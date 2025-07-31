@@ -1,11 +1,13 @@
-import { date, integer } from "drizzle-orm/pg-core";
-import { text, varchar } from "drizzle-orm/pg-core";
+import { integer, pgEnum, timestamp } from "drizzle-orm/pg-core";
+import { text } from "drizzle-orm/pg-core";
 import { pgTable } from "drizzle-orm/pg-core";
 
+export const processorEnum = pgEnum("processor", ["default", "fallback"]);
+
 export const payments = pgTable("payments", {
-  correlationId: text().primaryKey(),
-  amountInCents: integer().notNull(),
-  requestedAt: date({ mode: "date" }).notNull(),
-  processor: varchar({ length: 20 }),
-  createdAt: date({ mode: "date" }).notNull().defaultNow(),
+  correlationId: text("correlation_id").primaryKey(),
+  amountInCents: integer("amount_in_cents").notNull(),
+  requestedAt: timestamp("requested_at", { mode: "date" }).notNull(),
+  processor: processorEnum("processor"),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });

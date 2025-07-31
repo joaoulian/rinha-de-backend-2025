@@ -9,15 +9,18 @@ declare module "fastify" {
 }
 
 const drizzlePlugin: FastifyPluginAsync = async (fastify: FastifyInstance) => {
+  fastify.log.info("Registering Drizzle plugin...");
+
   const databaseManager = new DatabaseManager(fastify.appConfig, fastify.log);
   const db = await databaseManager.connect();
+
   fastify.decorate("db", db);
+
   fastify.addHook("onClose", async () => {
     await databaseManager.disconnect();
   });
+
+  fastify.log.info("Drizzle plugin registered successfully");
 };
 
-export default fp(drizzlePlugin, {
-  name: "drizzle-plugin",
-  dependencies: ["config-plugin"],
-});
+export default fp(drizzlePlugin);

@@ -16,7 +16,7 @@ const environmentConfigSchema = z.object({
   REDIS_URL: z.string().default("redis://localhost:6379"),
   DATABASE_URL: z
     .string()
-    .default("postgresql://docker:docker@database:5432/rinha_de_backend_2025"),
+    .default("postgresql://docker:docker@localhost:5482/rinha_de_backend_2025"),
 });
 
 // Load environment variables
