@@ -1,7 +1,7 @@
 import type { FastifyBaseLogger } from "fastify";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 import { DrizzleDB } from "../database-manager";
-import { payments } from "../schema/payments";
+import { payments, PaymentType } from "../schema/payments";
 
 export interface CreatePaymentInput {
   correlationId: string;
@@ -58,14 +58,15 @@ export class PaymentRepository {
     }
   }
 
-  async getPaymentByCorrelationId(correlationId: string) {
+  async getPaymentByCorrelationId(
+    correlationId: string
+  ): Promise<PaymentType | null> {
     try {
       const result = await this.db
         .select()
         .from(payments)
         .where(eq(payments.correlationId, correlationId))
         .limit(1);
-
       return result[0] || null;
     } catch (error) {
       this.logger.error(

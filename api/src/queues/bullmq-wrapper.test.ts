@@ -24,8 +24,9 @@ const mockAppConfig: AppConfig = {
   LOG_LEVEL: "info",
   PROCESSOR_DEFAULT_URL: "http://localhost:8001",
   PROCESSOR_FALLBACK_URL: "http://localhost:8002",
-  RABBITMQ_URL: "amqp://localhost:5672",
   REDIS_URL: "redis://localhost:6379",
+  DATABASE_URL:
+    "postgresql://docker:docker@localhost:5482/rinha_de_backend_2025",
 };
 
 describe("BullMQWrapper", () => {

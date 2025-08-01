@@ -9,7 +9,6 @@ async function start() {
       host: "0.0.0.0",
       port: app.appConfig.PORT,
     });
-    app.log.info(`🚀 Server running on http://localhost:${appConfig.PORT}`);
     app.log.info(`📝 Environment: ${appConfig.NODE_ENV}`);
   } catch (error) {
     console.error("❌ Error starting server:", error);

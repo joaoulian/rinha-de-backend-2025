@@ -17,27 +17,14 @@ const routes: FastifyPluginCallback = (fastify, _options, done) => {
     },
     handler: async function (request, reply) {
       const { correlationId, amount } = request.body;
-      const paymentQueueService = fastify.diContainer.resolve(
-        "paymentQueueService"
-      );
-      const paymentRepository =
-        fastify.diContainer.resolve("paymentRepository");
-
-      // Create payment record in database
-      await paymentRepository.createPayment({
-        correlationId,
-        amountInCents: amount * 100, // Convert to cents
-        requestedAt: new Date(),
-      });
-
-      // Queue payment for processing
-      await paymentQueueService.queuePayment({
+      const createPayment = fastify.diContainer.resolve("createPayment");
+      const response = await createPayment.execute({
         correlationId,
         amount,
-        requestedAt: new Date(),
-        preferredHost: "default",
       });
-
+      if (response.isFailure()) {
+        return reply.status(400).send(response.getError().error);
+      }
       return reply.status(200).send();
     },
   });
@@ -46,7 +33,7 @@ const routes: FastifyPluginCallback = (fastify, _options, done) => {
     method: "GET",
     url: "/payments-summary",
     schema: {
-      query: z.object({
+      querystring: z.object({
         from: z.string().optional(),
         to: z.string().optional(),
       }),

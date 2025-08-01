@@ -1,4 +1,4 @@
-import { fastify } from "fastify";
+import { fastify, FastifyInstance } from "fastify";
 import type { PinoLoggerOptions } from "fastify/types/logger";
 import {
   serializerCompiler,
@@ -9,6 +9,7 @@ import configPlugin from "./plugins/config-plugin";
 import drizzlePlugin from "./plugins/drizzle-plugin";
 import diContainerPlugin from "./plugins/di-container-plugin";
 import routes from "./routes";
+import { ProcessPayment } from "./use-cases/process-payment";
 
 export class AppBuilder {
   async build() {
@@ -35,7 +36,16 @@ export class AppBuilder {
         message: `Route ${request.method}:${request.url} not found`,
       });
     });
+    this.createWorkers(app);
     return app;
+  }
+
+  private createWorkers(app: FastifyInstance): void {
+    const processPayment = app.diContainer.resolve("processPayment");
+    const paymentQueueService = app.diContainer.resolve("paymentQueueService");
+    paymentQueueService.registerWorker(
+      processPayment.execute.bind(processPayment)
+    );
   }
 
   private getLoggerConfig(): PinoLoggerOptions | boolean {

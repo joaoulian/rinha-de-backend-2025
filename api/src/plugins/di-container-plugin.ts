@@ -12,6 +12,8 @@ import { BullMQWrapper } from "../queues/bullmq-wrapper";
 import { PaymentQueueService } from "../services/payment-queue.service";
 import { PaymentRepository } from "../db/repositories/payment.repository";
 import { DrizzleDB } from "../db/database-manager";
+import { CreatePayment } from "../use-cases/create-payment";
+import { ProcessPayment } from "../use-cases/process-payment";
 
 declare module "@fastify/awilix" {
   interface Cradle {
@@ -22,6 +24,8 @@ declare module "@fastify/awilix" {
     bullMQWrapper: BullMQWrapper;
     paymentQueueService: PaymentQueueService;
     paymentRepository: PaymentRepository;
+    createPayment: CreatePayment;
+    processPayment: ProcessPayment;
   }
 }
 
@@ -29,12 +33,10 @@ const diContainerPlugin: FastifyPluginAsync = async (
   fastify: FastifyInstance
 ) => {
   fastify.log.info("Registering DI Container plugin...");
-
   await fastify.register(fastifyAwilixPlugin, {
     disposeOnClose: true,
     disposeOnResponse: true,
   });
-
   diContainer.register({
     appConfig: asValue(fastify.appConfig),
     logger: asValue(fastify.log),
@@ -43,8 +45,9 @@ const diContainerPlugin: FastifyPluginAsync = async (
     bullMQWrapper: asClass(BullMQWrapper).singleton(),
     paymentQueueService: asClass(PaymentQueueService).singleton(),
     paymentRepository: asClass(PaymentRepository).singleton(),
+    createPayment: asClass(CreatePayment).singleton(),
+    processPayment: asClass(ProcessPayment).singleton(),
   });
-
   fastify.log.info("DI Container plugin registered successfully");
 };
 
