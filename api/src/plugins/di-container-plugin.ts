@@ -14,12 +14,14 @@ import { PaymentRepository } from "../db/repositories/payment.repository";
 import { DrizzleDB } from "../db/database-manager";
 import { CreatePayment } from "../use-cases/create-payment";
 import { ProcessPayment } from "../use-cases/process-payment";
+import Redis from "ioredis";
 
 declare module "@fastify/awilix" {
   interface Cradle {
     appConfig: AppConfig;
     logger: FastifyBaseLogger;
     db: DrizzleDB;
+    redis: Redis;
     paymentProcessorGateway: PaymentProcessorGateway;
     bullMQWrapper: BullMQWrapper;
     paymentQueueService: PaymentQueueService;
@@ -41,6 +43,7 @@ const diContainerPlugin: FastifyPluginAsync = async (
     appConfig: asValue(fastify.appConfig),
     logger: asValue(fastify.log),
     db: asValue(fastify.db),
+    redis: asValue(fastify.redis),
     paymentProcessorGateway: asClass(PaymentProcessorGateway).singleton(),
     bullMQWrapper: asClass(BullMQWrapper).singleton(),
     paymentQueueService: asClass(PaymentQueueService).singleton(),

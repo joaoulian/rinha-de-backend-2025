@@ -8,7 +8,6 @@ import {
 } from "bullmq";
 import Redis from "ioredis";
 import type { FastifyBaseLogger } from "fastify";
-import type { AppConfig } from "../plugins/config-plugin";
 
 export interface BullMQConfig {
   defaultJobOptions?: JobsOptions;
@@ -17,7 +16,7 @@ export interface BullMQConfig {
 
 export interface BullMQWrapperDeps {
   logger: FastifyBaseLogger;
-  appConfig: AppConfig;
+  redis: Redis;
 }
 
 export interface JobHandler<T = any, R = any> {
@@ -46,11 +45,7 @@ export class BullMQWrapper {
   constructor(deps: BullMQWrapperDeps) {
     this.logger = deps.logger;
     this.config = this.buildConfig();
-    this.redis = new Redis(deps.appConfig.REDIS_URL, {
-      maxRetriesPerRequest: null,
-      lazyConnect: true,
-    });
-    this.setupRedisEventHandlers();
+    this.redis = deps.redis;
   }
 
   private buildConfig(): BullMQConfig {
@@ -76,24 +71,6 @@ export class BullMQWrapper {
         },
       },
     };
-  }
-
-  private setupRedisEventHandlers(): void {
-    this.redis.on("connect", () => {
-      this.logger.info("Connected to Redis for BullMQ");
-    });
-
-    this.redis.on("error", (error) => {
-      this.logger.error({ error }, "Redis connection error");
-    });
-
-    this.redis.on("close", () => {
-      this.logger.warn("Redis connection closed");
-    });
-
-    this.redis.on("reconnecting", () => {
-      this.logger.info("Reconnecting to Redis...");
-    });
   }
 
   getQueue(name: string, options?: JobsOptions): Queue {
@@ -278,8 +255,7 @@ export class BullMQWrapper {
     );
     await Promise.all(queuePromises);
 
-    // Close Redis connection
-    await this.redis.quit();
+    // Note: Redis connection is managed by the Redis plugin and will be closed there
 
     this.logger.info("BullMQ wrapper shutdown complete");
   }

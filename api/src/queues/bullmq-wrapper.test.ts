@@ -1,6 +1,5 @@
 import { BullMQWrapper } from "./bullmq-wrapper";
 import type { FastifyBaseLogger } from "fastify";
-import type { AppConfig } from "../plugins/config-plugin";
 
 // Mock Redis and BullMQ
 jest.mock("ioredis");
@@ -18,16 +17,10 @@ const mockLogger: FastifyBaseLogger = {
   silent: false,
 } as any;
 
-const mockAppConfig: AppConfig = {
-  PORT: 3000,
-  NODE_ENV: "test",
-  LOG_LEVEL: "info",
-  PROCESSOR_DEFAULT_URL: "http://localhost:8001",
-  PROCESSOR_FALLBACK_URL: "http://localhost:8002",
-  REDIS_URL: "redis://localhost:6379",
-  DATABASE_URL:
-    "postgresql://docker:docker@localhost:5482/rinha_de_backend_2025",
-};
+const mockRedis = {
+  on: jest.fn(),
+  quit: jest.fn(),
+} as any;
 
 describe("BullMQWrapper", () => {
   let bullMQWrapper: BullMQWrapper;
@@ -36,7 +29,7 @@ describe("BullMQWrapper", () => {
     jest.clearAllMocks();
     bullMQWrapper = new BullMQWrapper({
       logger: mockLogger,
-      appConfig: mockAppConfig,
+      redis: mockRedis,
     });
   });
 
