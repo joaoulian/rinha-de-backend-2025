@@ -5,11 +5,15 @@ export class Cents {
     this.value = value;
   }
 
-  public static fromUnits(value: number): Cents {
+  public static fromFloat(value: number): Cents {
     return new Cents(value * 100);
   }
 
-  public toUnits(): number {
+  public static create(valueInCents: number): Cents {
+    return new Cents(valueInCents);
+  }
+
+  public toFloat(): number {
     return this.value / 100;
   }
 }

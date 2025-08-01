@@ -1,6 +1,7 @@
 import axios from "axios";
 import type { FastifyBaseLogger } from "fastify";
 import type { AppConfig } from "../plugins/config-plugin";
+import type { HostHealthCacheService } from "../services/host-health-cache.service";
 
 export type ProcessPaymentInput = {
   amount: number;
@@ -13,6 +14,7 @@ export type Host = "default" | "fallback";
 export interface PaymentProcessorGatewayDeps {
   logger: FastifyBaseLogger;
   appConfig: AppConfig;
+  hostHealthCacheService: HostHealthCacheService;
 }
 
 export class PaymentProcessorGateway {
@@ -20,6 +22,7 @@ export class PaymentProcessorGateway {
     [key in Host]: string;
   };
   private readonly logger: PaymentProcessorGatewayDeps["logger"];
+  private readonly hostHealthCacheService: PaymentProcessorGatewayDeps["hostHealthCacheService"];
 
   constructor(deps: PaymentProcessorGatewayDeps) {
     this.serverUrls = {
@@ -27,6 +30,7 @@ export class PaymentProcessorGateway {
       ["fallback"]: deps.appConfig.PROCESSOR_FALLBACK_URL,
     };
     this.logger = deps.logger;
+    this.hostHealthCacheService = deps.hostHealthCacheService;
   }
 
   async processPayment(
@@ -58,8 +62,30 @@ export class PaymentProcessorGateway {
   async checkHealth(
     host: Host = "default"
   ): Promise<{ failing: boolean; minResponseTime: number }> {
+    this.logger.debug({ host }, "Checking host health");
+    const cachedHealth = await this.hostHealthCacheService.getCachedHealth(
+      host
+    );
+    if (cachedHealth) {
+      this.logger.debug(
+        { host, cachedAt: cachedHealth.cachedAt },
+        "Using cached health data"
+      );
+      return {
+        failing: cachedHealth.failing,
+        minResponseTime: cachedHealth.minResponseTime,
+      };
+    }
+    const healthData = await this.fetchHealth(host);
+    await this.hostHealthCacheService.cacheHealth(host, healthData);
+    return healthData;
+  }
+
+  async fetchHealth(
+    host: Host = "default"
+  ): Promise<{ failing: boolean; minResponseTime: number }> {
     try {
-      this.logger.info(`Checking health of ${host} payment processor`);
+      this.logger.debug({ host }, "Fetching host health");
       const response = await axios.get<{
         failing: boolean;
         minResponseTime: number;
@@ -70,7 +96,41 @@ export class PaymentProcessorGateway {
         { error: e.message },
         `Error in ${host} payment processor`
       );
-      throw e;
+      return {
+        failing: true,
+        minResponseTime: 0,
+      };
+    }
+  }
+
+  async getBestAvailableHost(): Promise<{
+    host: Host;
+    minResponseTime: number;
+    failing: boolean;
+  }> {
+    const [defaultHealth, fallbackHealth] = await Promise.all([
+      this.checkHealth("default"),
+      this.checkHealth("fallback"),
+    ]);
+    if (!defaultHealth.failing) {
+      return {
+        host: "default",
+        minResponseTime: defaultHealth.minResponseTime,
+        failing: defaultHealth.failing,
+      };
+    } else if (!fallbackHealth.failing) {
+      return {
+        host: "fallback",
+        minResponseTime: fallbackHealth.minResponseTime,
+        failing: fallbackHealth.failing,
+      };
+    } else {
+      this.logger.warn("Both hosts appear unhealthy, using default");
+      return {
+        host: "default",
+        minResponseTime: defaultHealth.minResponseTime,
+        failing: defaultHealth.failing,
+      };
     }
   }
 

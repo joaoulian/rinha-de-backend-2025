@@ -1,6 +1,7 @@
 import type { FastifyPluginCallback } from "fastify";
 import fp from "fastify-plugin";
 import z from "zod";
+import { Cents } from "./shared/cents";
 
 const routes: FastifyPluginCallback = (fastify, _options, done) => {
   fastify.route<{ Body: { correlationId: string; amount: number } }>({
@@ -65,11 +66,11 @@ const routes: FastifyPluginCallback = (fastify, _options, done) => {
       return reply.status(200).send({
         default: {
           totalRequests: defaultSummary.totalRequests,
-          totalAmount: defaultSummary.totalAmount / 100, // Convert from cents
+          totalAmount: Cents.create(defaultSummary.totalAmount).toFloat(),
         },
         fallback: {
           totalRequests: fallbackSummary.totalRequests,
-          totalAmount: fallbackSummary.totalAmount / 100, // Convert from cents
+          totalAmount: Cents.create(fallbackSummary.totalAmount).toFloat(),
         },
       });
     },

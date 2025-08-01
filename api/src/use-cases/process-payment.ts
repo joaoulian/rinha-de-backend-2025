@@ -47,6 +47,19 @@ export class ProcessPayment extends UseCase<
       retryCount = 0,
       preferredHost = "default",
     } = job.data;
+    const existentPayment =
+      await this.paymentRepository.getPaymentByCorrelationId(correlationId);
+    if (!existentPayment) {
+      instrumentation.logErrorOccurred(
+        new Error("Payment not found"),
+        "Payment not found"
+      );
+      return;
+    }
+    if (existentPayment.processor) {
+      instrumentation.logDebug("Payment already processed");
+      return;
+    }
     instrumentation.logDebug(
       `Processing payment job ${job.id} for ${correlationId}`
     );
@@ -66,19 +79,25 @@ export class ProcessPayment extends UseCase<
       });
     } catch (error) {
       instrumentation.logErrorOccurred(error, "Payment processing failed");
-      if (preferredHost === "default" && retryCount === 0) {
-        instrumentation.logDebug("Retrying payment with fallback host");
+      const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 0) - 1;
+      if (isLastAttempt) {
+        const otherHost = preferredHost === "default" ? "fallback" : "default";
+        instrumentation.logDebug(`Retrying payment with ${otherHost} host`);
+        const health = await this.paymentProcessorGateway.checkHealth(
+          otherHost
+        );
         await this.paymentQueueService.scheduleRetryPayment(
           {
             ...job.data,
             retryCount: retryCount + 1,
-            preferredHost: "fallback",
+            preferredHost: otherHost,
           },
           job.priority,
-          5000
-        ); // Retry in 5 seconds
+          health.minResponseTime // Retry after the minimum response time
+        );
         return;
       }
+      // If not the last attempt, let BullMQ handle the retry using the backoff strategy
       throw error;
     }
     await this.paymentRepository.updatePaymentProcessor(

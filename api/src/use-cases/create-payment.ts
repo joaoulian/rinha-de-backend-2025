@@ -50,7 +50,7 @@ export class CreatePayment extends UseCase<
     }
     const paymentData = {
       correlationId,
-      amountInCents: Cents.fromUnits(amount),
+      amountInCents: Cents.fromFloat(amount),
       requestedAt: new Date(),
     };
     instrumentation.logDebug("Creating payment record", { paymentData });
@@ -67,7 +67,7 @@ export class CreatePayment extends UseCase<
     const jobId = await this.paymentQueueService.queuePayment(
       {
         correlationId,
-        amount: paymentData.amountInCents.toUnits(),
+        amount: paymentData.amountInCents.toFloat(),
         requestedAt: paymentData.requestedAt,
       },
       priority
@@ -80,7 +80,7 @@ export class CreatePayment extends UseCase<
   }
 
   private calculatePriority(amount: Cents): number {
-    const units = amount.toUnits();
+    const units = amount.toFloat();
     if (units >= 10000) return 1;
     if (units >= 1000) return 5;
     return 10;

@@ -10,6 +10,7 @@ import { PaymentProcessorGateway } from "../gateways/payment-processor-gateway";
 import { AppConfig } from "./config-plugin";
 import { BullMQWrapper } from "../queues/bullmq-wrapper";
 import { PaymentQueueService } from "../services/payment-queue.service";
+import { HostHealthCacheService } from "../services/host-health-cache.service";
 import { PaymentRepository } from "../db/repositories/payment.repository";
 import { DrizzleDB } from "../db/database-manager";
 import { CreatePayment } from "../use-cases/create-payment";
@@ -22,6 +23,7 @@ declare module "@fastify/awilix" {
     logger: FastifyBaseLogger;
     db: DrizzleDB;
     redis: Redis;
+    hostHealthCacheService: HostHealthCacheService;
     paymentProcessorGateway: PaymentProcessorGateway;
     bullMQWrapper: BullMQWrapper;
     paymentQueueService: PaymentQueueService;
@@ -44,6 +46,7 @@ const diContainerPlugin: FastifyPluginAsync = async (
     logger: asValue(fastify.log),
     db: asValue(fastify.db),
     redis: asValue(fastify.redis),
+    hostHealthCacheService: asClass(HostHealthCacheService).singleton(),
     paymentProcessorGateway: asClass(PaymentProcessorGateway).singleton(),
     bullMQWrapper: asClass(BullMQWrapper).singleton(),
     paymentQueueService: asClass(PaymentQueueService).singleton(),
