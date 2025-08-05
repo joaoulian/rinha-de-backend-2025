@@ -31,10 +31,8 @@ export class DatabaseManager {
     return {
       connectionString: appConfig.DATABASE_URL,
       pool: {
-        min: 2,
-        max: 10,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 30000,
+        min: 5,
+        max: 15,
       },
     };
   }
@@ -56,8 +54,6 @@ export class DatabaseManager {
           connectionString: this.config.connectionString,
           min: this.config.pool?.min,
           max: this.config.pool?.max,
-          idleTimeoutMillis: this.config.pool?.idleTimeoutMillis,
-          connectionTimeoutMillis: this.config.pool?.connectionTimeoutMillis,
         });
         const client = await this.pool.connect();
         await client.query("SELECT 1");

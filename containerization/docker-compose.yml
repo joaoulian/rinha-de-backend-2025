@@ -7,8 +7,6 @@ services:
     hostname: api1
     environment:
       - PORT=9999
-      - PROCESSOR_DEFAULT_URL=http://payment-processor-default:8080
-      - PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
       - REDIS_URL=redis://cache:6379
       - DATABASE_URL=postgresql://docker:docker@database:5432/rinha_de_backend_2025
     networks:
@@ -19,15 +17,63 @@ services:
         condition: service_healthy
       cache:
         condition: service_started
+      migration:
+        condition: service_completed_successfully
     deploy:
       resources:
         limits:
-          cpus: "0.65"
-          memory: 155MB
+          cpus: "1.5"
+          memory: "350MB"
 
   api2:
     <<: *api
     hostname: api2
+
+  worker:
+    build:
+      context: ../api
+      dockerfile: Dockerfile
+    command: node dist/worker.js
+    hostname: worker
+    environment:
+      - REDIS_URL=redis://cache:6379
+      - DATABASE_URL=postgresql://docker:docker@database:5432/rinha_de_backend_2025
+      - PROCESSOR_DEFAULT_URL=http://payment-processor-default:8080
+      - PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
+    networks:
+      - backend
+      - payment-processor
+    depends_on:
+      database:
+        condition: service_healthy
+      cache:
+        condition: service_started
+      migration:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: "350MB"
+
+  migration:
+    build:
+      context: ../api
+      dockerfile: Dockerfile.migration
+    command: pnpm db:migrate
+    networks:
+      - backend
+    environment:
+      - DATABASE_URL=postgresql://docker:docker@database:5432/rinha_de_backend_2025
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: "no"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: "350MB"
 
   database:
     image: postgres:alpine
@@ -50,8 +96,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.05"
-          memory: "70MB"
+          cpus: "1.5"
+          memory: "350MB"
 
   cache:
     image: redis:7-alpine
@@ -65,8 +111,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.05"
-          memory: "70MB"
+          cpus: "1.5"
+          memory: "350MB"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s

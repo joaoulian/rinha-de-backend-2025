@@ -5,8 +5,10 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
+    "db:migrate": "drizzle-kit migrate",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
+    "start:worker": "node dist/worker.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
