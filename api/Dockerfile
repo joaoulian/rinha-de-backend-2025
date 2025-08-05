@@ -8,7 +8,7 @@ COPY . .
 RUN pnpm run build
 
 # runner
-FROM node:18-slim AS production
+FROM node:22-slim AS production
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules

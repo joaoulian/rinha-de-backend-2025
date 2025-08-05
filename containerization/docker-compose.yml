@@ -38,13 +38,13 @@ services:
       - POSTGRES_PASSWORD=docker
       - POSTGRES_DB=rinha_de_backend_2025
     volumes:
-      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - database_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U docker -d rinha_de_backend_2025"]
       interval: 5s
       timeout: 5s
-      retries: 5
-      start_period: 10s
+      retries: 10
+      start_period: 30s
     networks:
       - backend
     deploy:

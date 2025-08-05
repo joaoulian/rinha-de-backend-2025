@@ -34,7 +34,7 @@ export class DatabaseManager {
         min: 2,
         max: 10,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 5000,
+        connectionTimeoutMillis: 30000,
       },
     };
   }
@@ -43,26 +43,50 @@ export class DatabaseManager {
     if (this.db) {
       return this.db;
     }
-    try {
-      this.logger.info("Connecting to PostgreSQL database...");
-      this.pool = new Pool({
-        connectionString: this.config.connectionString,
-        min: this.config.pool?.min,
-        max: this.config.pool?.max,
-        idleTimeoutMillis: this.config.pool?.idleTimeoutMillis,
-        connectionTimeoutMillis: this.config.pool?.connectionTimeoutMillis,
-      });
-      const client = await this.pool.connect();
-      await client.query("SELECT 1");
-      client.release();
-      this.db = drizzle(this.pool, { schema });
-      this.setupPoolEventHandlers();
-      this.logger.info("Successfully connected to PostgreSQL database");
-      return this.db;
-    } catch (error) {
-      this.logger.error({ error }, "Failed to connect to PostgreSQL database");
-      throw error;
+
+    const maxRetries = 5;
+    const retryDelay = 2000; // 2 seconds
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        this.logger.info(
+          `Connecting to PostgreSQL database... (attempt ${attempt}/${maxRetries})`
+        );
+        this.pool = new Pool({
+          connectionString: this.config.connectionString,
+          min: this.config.pool?.min,
+          max: this.config.pool?.max,
+          idleTimeoutMillis: this.config.pool?.idleTimeoutMillis,
+          connectionTimeoutMillis: this.config.pool?.connectionTimeoutMillis,
+        });
+        const client = await this.pool.connect();
+        await client.query("SELECT 1");
+        client.release();
+        this.db = drizzle(this.pool, { schema });
+        this.setupPoolEventHandlers();
+        this.logger.info("Successfully connected to PostgreSQL database");
+        return this.db;
+      } catch (error) {
+        this.logger.error(
+          { error, attempt },
+          `Failed to connect to PostgreSQL database (attempt ${attempt}/${maxRetries})`
+        );
+
+        if (this.pool) {
+          await this.pool.end().catch(() => {}); // Clean up failed pool
+          this.pool = null;
+        }
+
+        if (attempt === maxRetries) {
+          throw error;
+        }
+
+        this.logger.info(`Retrying database connection in ${retryDelay}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      }
     }
+
+    throw new Error("Failed to connect to database after all retries");
   }
 
   private setupPoolEventHandlers(): void {

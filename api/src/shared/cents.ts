@@ -6,14 +6,14 @@ export class Cents {
   }
 
   public static fromFloat(value: number): Cents {
-    return new Cents(value * 100);
+    return new Cents(Math.round(value * 100));
   }
 
   public static create(valueInCents: number): Cents {
-    return new Cents(valueInCents);
+    return new Cents(Math.round(valueInCents));
   }
 
   public toFloat(): number {
-    return this.value / 100;
+    return this.value / 100.0;
   }
 }
