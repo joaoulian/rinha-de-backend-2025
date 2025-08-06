@@ -198,14 +198,6 @@ Delay = minResponseTime
 Nova Tentativa de Processamento
 ```
 
-### Benefícios da Estratégia
-
-- **Alta Disponibilidade**: Failover automático entre processadores
-- **Performance**: Cache Redis reduz latência de verificações
-- **Resiliência**: Múltiplas camadas de retry
-- **Inteligência**: Delay baseado no tempo de resposta real
-- **Observabilidade**: Logs detalhados de cada tentativa
-
 ## � Imagens Docker Hub
 
 O projeto está disponível no Docker Hub com imagens pré-construídas:
