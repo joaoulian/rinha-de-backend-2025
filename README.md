@@ -5,9 +5,9 @@ Intermediador de pagamentos desenvolvido para a [Rinha de Backend 2025](https://
 ## 🚀 Tecnologias Utilizadas
 
 - **Node.js 22** - Runtime JavaScript
-- **TypeScript 5.5** - Superset do JavaScript com tipagem estática
+- **TypeScript** - Superset do JavaScript com tipagem estática
 - **Redis 7** - Cache em memória e broker de mensagens
-- **BullMQ 5.56** - Sistema de filas baseado em Redis
+- **BullMQ** - Sistema de filas baseado em Redis
 - **Nginx** - Load balancer e proxy reverso
 
 ## 🏗️ Arquitetura
@@ -19,8 +19,7 @@ O projeto segue uma arquitetura com:
 - **Load Balancer**: Nginx para distribuição de carga
 - **Cache**: Redis para otimização de performance
 - **Processadores de Pagamento**: Serviços externos simulando processadores de pagamentos
-<img width="965" height="532" alt="image" src="https://github.com/user-attachments/assets/e5e41933-b19f-440c-9492-50eb883ed177" />
-
+  <img width="965" height="532" alt="image" src="https://github.com/user-attachments/assets/e5e41933-b19f-440c-9492-50eb883ed177" />
 
 ## 🚀 Como Executar o Projeto
 
