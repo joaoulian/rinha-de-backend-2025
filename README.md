@@ -21,7 +21,7 @@ O projeto segue uma arquitetura com:
 - **Cache**: Redis para otimização de performance
 - **Banco de Dados**: PostgreSQL com migrações automáticas
 - **Processadores de Pagamento**: Serviços externos simulando processadores de pagamentos
-<img width="965" height="532" alt="image" src="https://github.com/user-attachments/assets/26a468da-141c-46e4-aeaf-8f4d5c5abee2" />
+  <img width="965" height="532" alt="image" src="https://github.com/user-attachments/assets/26a468da-141c-46e4-aeaf-8f4d5c5abee2" />
 
 ## 🚀 Como Executar o Projeto
 
@@ -38,29 +38,8 @@ docker compose -f ./containerization/docker-compose-payment-processors.yml up -d
 
 ### 2. Executar a API Principal
 
-#### Opção A: Usando Imagens do Docker Hub (Recomendado)
-
-```bash
-docker compose -f ./containerization/docker-compose.yml up -d
-```
-
-#### Opção B: Build Local para Desenvolvimento
-
 ```bash
 docker compose -f ./containerization/docker-compose.dev.yml up -d
-```
-
-### 3. Verificar se os Serviços Estão Funcionando
-
-```bash
-# Verificar status dos containers
-docker compose -f ./containerization/docker-compose.yml ps
-
-# Verificar logs da API
-docker compose -f ./containerization/docker-compose.yml logs -f api1
-
-# Verificar logs do worker
-docker compose -f ./containerization/docker-compose.yml logs -f worker
 ```
 
 ### 4. Testar a API
