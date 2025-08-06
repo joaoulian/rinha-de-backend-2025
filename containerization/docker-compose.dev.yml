@@ -11,96 +11,43 @@ services:
     environment:
       - PORT=9999
       - REDIS_URL=redis://cache:6379
-      - DATABASE_URL=postgresql://docker:docker@database:5432/rinha_de_backend_2025
     networks:
       - backend
       - payment-processor
     depends_on:
-      database:
-        condition: service_healthy
       cache:
         condition: service_started
-      migration:
-        condition: service_completed_successfully
     deploy:
       resources:
         limits:
-          cpus: "1.5"
-          memory: "350MB"
+          cpus: "0.3"
+          memory: "65MB"
 
   api2:
     <<: *api
     hostname: api2
 
-  worker:
+  worker1:
     build:
       context: ../api
       dockerfile: Dockerfile
     command: node dist/worker.js
-    hostname: worker
+    hostname: worker1
     environment:
       - REDIS_URL=redis://cache:6379
-      - DATABASE_URL=postgresql://docker:docker@database:5432/rinha_de_backend_2025
       - PROCESSOR_DEFAULT_URL=http://payment-processor-default:8080
       - PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
     networks:
       - backend
       - payment-processor
     depends_on:
-      database:
-        condition: service_healthy
       cache:
         condition: service_started
-      migration:
-        condition: service_completed_successfully
     deploy:
       resources:
         limits:
-          cpus: "1.5"
-          memory: "350MB"
-
-  migration:
-    build:
-      context: ../api
-      dockerfile: Dockerfile.migration
-    command: pnpm db:migrate
-    networks:
-      - backend
-    environment:
-      - DATABASE_URL=postgresql://docker:docker@database:5432/rinha_de_backend_2025
-    depends_on:
-      database:
-        condition: service_healthy
-    restart: "no"
-    deploy:
-      resources:
-        limits:
-          cpus: "1.5"
-          memory: "350MB"
-
-  database:
-    image: postgres:alpine
-    ports:
-      - "5482:5432"
-    environment:
-      - POSTGRES_USER=docker
-      - POSTGRES_PASSWORD=docker
-      - POSTGRES_DB=rinha_de_backend_2025
-    volumes:
-      - database_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U docker -d rinha_de_backend_2025"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-    networks:
-      - backend
-    deploy:
-      resources:
-        limits:
-          cpus: "1.5"
-          memory: "350MB"
+          cpus: "0.5"
+          memory: "100MB"
 
   cache:
     image: redis:7-alpine
@@ -114,8 +61,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "1.5"
-          memory: "350MB"
+          cpus: "0.3"
+          memory: "100MB"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -136,12 +83,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.15"
-          memory: "42MB"
+          cpus: "0.1"
+          memory: "25MB"
 
 volumes:
   redis_data:
-  database_data:
 
 networks:
   backend:

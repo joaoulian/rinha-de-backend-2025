@@ -1,10 +1,10 @@
 import type { FastifyBaseLogger } from "fastify";
-import type { PaymentRepository } from "../db/repositories/payment.repository";
 import type { PaymentQueueService } from "../services/payment-queue.service";
 import type { IInstrumentation } from "../shared/instrumentation";
 import { UseCase } from "../shared/use-case";
 import { Either, failure, success } from "../shared/either";
 import { Cents } from "../shared/cents";
+import { RedisPaymentRepository } from "../repositories/payment-repository";
 
 export interface CreatePaymentRequest {
   correlationId: string;
@@ -20,7 +20,7 @@ export type CreatePaymentResponse = Either<
 
 export interface CreatePaymentDeps {
   paymentQueueService: PaymentQueueService;
-  paymentRepository: PaymentRepository;
+  redisPaymentRepository: RedisPaymentRepository;
   logger: FastifyBaseLogger;
 }
 
@@ -30,12 +30,12 @@ export class CreatePayment extends UseCase<
 > {
   serviceName = "create-payment";
   private readonly paymentQueueService: CreatePaymentDeps["paymentQueueService"];
-  private readonly paymentRepository: CreatePaymentDeps["paymentRepository"];
+  private readonly redisPaymentRepository: CreatePaymentDeps["redisPaymentRepository"];
 
   constructor(deps: CreatePaymentDeps) {
     super(deps.logger);
     this.paymentQueueService = deps.paymentQueueService;
-    this.paymentRepository = deps.paymentRepository;
+    this.redisPaymentRepository = deps.redisPaymentRepository;
   }
 
   async run(
@@ -43,7 +43,9 @@ export class CreatePayment extends UseCase<
     { correlationId, amount }: CreatePaymentRequest
   ): Promise<CreatePaymentResponse> {
     const existentPayment =
-      await this.paymentRepository.getPaymentByCorrelationId(correlationId);
+      await this.redisPaymentRepository.getPaymentByCorrelationId(
+        correlationId
+      );
     if (existentPayment) {
       instrumentation.logWarning("Payment already exists");
       return failure({ error: "Payment already exists" });
@@ -54,7 +56,7 @@ export class CreatePayment extends UseCase<
       requestedAt: new Date(),
     };
     instrumentation.logDebug("Creating payment record", { paymentData });
-    await this.paymentRepository.createPayment({
+    await this.redisPaymentRepository.createPayment({
       ...paymentData,
       amountInCents: paymentData.amountInCents.value,
     });

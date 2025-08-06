@@ -129,7 +129,6 @@ fi
 
 # Configurações das imagens
 API_IMAGE="${DOCKER_USERNAME}/rinha-backend-2025-api"
-MIGRATION_IMAGE="${DOCKER_USERNAME}/rinha-backend-2025-migration"
 
 # Opções de build
 BUILD_OPTS=""
@@ -172,25 +171,6 @@ else
         -f Dockerfile .
 fi
 
-# Build da imagem de migração
-echo -e "${BLUE}🏗️  Construindo imagem de migração...${NC}"
-log "Comando: docker buildx build --platform ${PLATFORMS} -t ${MIGRATION_IMAGE}:${VERSION} -t ${MIGRATION_IMAGE}:latest ${BUILD_OPTS} -f Dockerfile.migration ."
-
-if [[ "$PLATFORMS" == *","* ]]; then
-    docker buildx build \
-        --platform "${PLATFORMS}" \
-        -t "${MIGRATION_IMAGE}:${VERSION}" \
-        -t "${MIGRATION_IMAGE}:latest" \
-        ${BUILD_OPTS} \
-        -f Dockerfile.migration .
-else
-    docker build \
-        -t "${MIGRATION_IMAGE}:${VERSION}" \
-        -t "${MIGRATION_IMAGE}:latest" \
-        ${BUILD_OPTS} \
-        -f Dockerfile.migration .
-fi
-
 cd ..
 
 echo ""
@@ -200,20 +180,15 @@ if [[ "$PUSH" == "true" ]]; then
     echo -e "${YELLOW}📋 Imagens disponíveis no Docker Hub:${NC}"
     echo -e "   • ${API_IMAGE}:${VERSION}"
     echo -e "   • ${API_IMAGE}:latest"
-    echo -e "   • ${MIGRATION_IMAGE}:${VERSION}"
-    echo -e "   • ${MIGRATION_IMAGE}:latest"
     echo ""
     echo -e "${BLUE}🔗 Links do Docker Hub:${NC}"
     echo -e "   • https://hub.docker.com/r/${DOCKER_USERNAME}/rinha-backend-2025-api"
-    echo -e "   • https://hub.docker.com/r/${DOCKER_USERNAME}/rinha-backend-2025-migration"
 else
     echo -e "${GREEN}✅ Build local concluído com sucesso!${NC}"
     echo ""
     echo -e "${YELLOW}📋 Imagens locais criadas:${NC}"
     echo -e "   • ${API_IMAGE}:${VERSION}"
     echo -e "   • ${API_IMAGE}:latest"
-    echo -e "   • ${MIGRATION_IMAGE}:${VERSION}"
-    echo -e "   • ${MIGRATION_IMAGE}:latest"
     echo ""
     echo -e "${BLUE}💡 Para fazer push, execute novamente com --push${NC}"
 fi

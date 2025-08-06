@@ -7,7 +7,6 @@ import {
 } from "fastify-type-provider-zod";
 import configPlugin from "./plugins/config-plugin";
 import redisPlugin from "./plugins/redis-plugin";
-import drizzlePlugin from "./plugins/drizzle-plugin";
 import diContainerPlugin from "./plugins/di-container-plugin";
 import routes from "./routes";
 
@@ -21,7 +20,6 @@ export class AppBuilder {
     app.setSerializerCompiler(serializerCompiler);
     await app.register(configPlugin);
     await app.register(redisPlugin);
-    await app.register(drizzlePlugin);
     await app.register(diContainerPlugin);
     await app.register(routes);
     app.setErrorHandler((error, request, reply) => {

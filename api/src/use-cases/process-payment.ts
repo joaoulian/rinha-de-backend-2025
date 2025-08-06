@@ -1,5 +1,4 @@
 import type { FastifyBaseLogger } from "fastify";
-import type { PaymentRepository } from "../db/repositories/payment.repository";
 import type { IInstrumentation } from "../shared/instrumentation";
 import type { PaymentProcessorGateway } from "../gateways/payment-processor-gateway";
 import type {
@@ -8,6 +7,7 @@ import type {
 } from "../services/payment-queue.service";
 import type { Job } from "bullmq";
 import { UseCase } from "../shared/use-case";
+import { RedisPaymentRepository } from "../repositories/payment-repository";
 
 export type ProcessPaymentRequest = Job<PaymentJobData>;
 
@@ -15,7 +15,7 @@ export type ProcessPaymentResponse = void;
 
 export interface ProcessPaymentDeps {
   paymentQueueService: PaymentQueueService;
-  paymentRepository: PaymentRepository;
+  redisPaymentRepository: RedisPaymentRepository;
   paymentProcessorGateway: PaymentProcessorGateway;
   logger: FastifyBaseLogger;
 }
@@ -26,13 +26,13 @@ export class ProcessPayment extends UseCase<
 > {
   serviceName = "process-payment";
   private readonly paymentQueueService: ProcessPaymentDeps["paymentQueueService"];
-  private readonly paymentRepository: ProcessPaymentDeps["paymentRepository"];
+  private readonly redisPaymentRepository: ProcessPaymentDeps["redisPaymentRepository"];
   private readonly paymentProcessorGateway: ProcessPaymentDeps["paymentProcessorGateway"];
 
   constructor(deps: ProcessPaymentDeps) {
     super(deps.logger);
     this.paymentQueueService = deps.paymentQueueService;
-    this.paymentRepository = deps.paymentRepository;
+    this.redisPaymentRepository = deps.redisPaymentRepository;
     this.paymentProcessorGateway = deps.paymentProcessorGateway;
   }
 
@@ -48,7 +48,9 @@ export class ProcessPayment extends UseCase<
       preferredHost = "default",
     } = job.data;
     const existentPayment =
-      await this.paymentRepository.getPaymentByCorrelationId(correlationId);
+      await this.redisPaymentRepository.getPaymentByCorrelationId(
+        correlationId
+      );
     if (!existentPayment) {
       instrumentation.logErrorOccurred(
         new Error("Payment not found"),
@@ -100,7 +102,7 @@ export class ProcessPayment extends UseCase<
       // If not the last attempt, let BullMQ handle the retry using the backoff strategy
       throw error;
     }
-    await this.paymentRepository.updatePaymentProcessor(
+    await this.redisPaymentRepository.updatePaymentProcessor(
       correlationId,
       preferredHost
     );
