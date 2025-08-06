@@ -1,9 +1,11 @@
-# Docker Compose para produção usando imagens do Docker Hub
-# Para desenvolvimento local, use docker-compose.dev.yml
+# Docker Compose para desenvolvimento local usando builds locais
+# Para produção, use docker-compose.yml
 
 services:
   api1: &api
-    image: joaoulian/rinha-backend-2025-api:latest
+    build:
+      context: ../api
+      dockerfile: Dockerfile
     command: node dist/index.js
     hostname: api1
     environment:
@@ -31,7 +33,9 @@ services:
     hostname: api2
 
   worker:
-    image: joaoulian/rinha-backend-2025-api:latest
+    build:
+      context: ../api
+      dockerfile: Dockerfile
     command: node dist/worker.js
     hostname: worker
     environment:
@@ -56,7 +60,9 @@ services:
           memory: "350MB"
 
   migration:
-    image: joaoulian/rinha-backend-2025-migration:latest
+    build:
+      context: ../api
+      dockerfile: Dockerfile.migration
     networks:
       - backend
     environment:

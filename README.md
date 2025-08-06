@@ -38,8 +38,16 @@ docker compose -f ./containerization/docker-compose-payment-processors.yml up -d
 
 ### 2. Executar a API Principal
 
+#### Opção A: Usando Imagens do Docker Hub (Recomendado)
+
 ```bash
 docker compose -f ./containerization/docker-compose.yml up -d
+```
+
+#### Opção B: Build Local para Desenvolvimento
+
+```bash
+docker compose -f ./containerization/docker-compose.dev.yml up -d
 ```
 
 ### 3. Verificar se os Serviços Estão Funcionando
@@ -219,20 +227,75 @@ Nova Tentativa de Processamento
 - **Inteligência**: Delay baseado no tempo de resposta real
 - **Observabilidade**: Logs detalhados de cada tentativa
 
-## 🛠️ Comandos Úteis
+## � Imagens Docker Hub
+
+O projeto está disponível no Docker Hub com imagens pré-construídas:
+
+- **API**: [`joaoulian/rinha-backend-2025-api`](https://hub.docker.com/r/joaoulian/rinha-backend-2025-api)
+- **Migration**: [`joaoulian/rinha-backend-2025-migration`](https://hub.docker.com/r/joaoulian/rinha-backend-2025-migration)
+
+### Build e Push das Imagens
 
 ```bash
-# Parar todos os serviços
+# Usando Make (recomendado)
+make push                    # Build e push para Docker Hub
+make build                   # Build apenas local
+make build-local            # Build rápido (plataforma atual)
+```
+
+### Configurar Suas Próprias Imagens
+
+1. **Editar Makefile**: Altere `DOCKER_USERNAME` para seu usuário
+2. **Build e Push**: Execute `make push`
+3. **Atualizar docker-compose.yml**: Substitua `joaoulian` pelo seu usuário
+
+## 🛠️ Comandos Úteis
+
+### Produção (Docker Hub)
+
+```bash
+# Iniciar serviços
+make run-prod
+
+# Parar serviços
+make stop
+
+# Ver logs
+make logs
+
+# Ver status
+make status
+```
+
+### Desenvolvimento (Build Local)
+
+```bash
+# Iniciar ambiente completo
+make dev
+
+# Iniciar apenas API (sem containers)
+make dev-api
+
+# Ver logs
+make logs-dev
+
+# Ver status
+make status-dev
+```
+
+### Docker Compose Direto
+
+```bash
+# Produção
+docker compose -f ./containerization/docker-compose.yml up -d
 docker compose -f ./containerization/docker-compose.yml down
+
+# Desenvolvimento
+docker compose -f ./containerization/docker-compose.dev.yml up -d
+docker compose -f ./containerization/docker-compose.dev.yml down
 
 # Limpar volumes (dados serão perdidos)
 docker compose -f ./containerization/docker-compose.yml down -v
-
-# Reconstruir imagens
-docker compose -f ./containerization/docker-compose.yml build --no-cache
-
-# Ver logs de todos os serviços
-docker compose -f ./containerization/docker-compose.yml logs -f
 
 # Executar migração manualmente
 docker compose -f ./containerization/docker-compose.yml run --rm migration
