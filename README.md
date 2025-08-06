@@ -21,6 +21,9 @@ O projeto segue uma arquitetura com:
 - **Cache**: Redis para otimização de performance
 - **Banco de Dados**: PostgreSQL com migrações automáticas
 - **Processadores de Pagamento**: Serviços externos simulando processadores de pagamentos
+<img width="965" height="532" alt="image" src="https://github.com/user-attachments/assets/5412c5a0-eb38-48b8-8044-3e1389da1239" />
+
+
 
 ## 🚀 Como Executar o Projeto
 
