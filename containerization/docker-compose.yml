@@ -19,7 +19,7 @@ services:
       resources:
         limits:
           cpus: "0.3"
-          memory: "60MB"
+          memory: "65MB"
 
   api2:
     <<: *api
@@ -43,7 +43,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: "60MB"
+          memory: "100MB"
 
   cache:
     image: redis:7-alpine
@@ -58,7 +58,7 @@ services:
       resources:
         limits:
           cpus: "0.3"
-          memory: "150MB"
+          memory: "100MB"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
