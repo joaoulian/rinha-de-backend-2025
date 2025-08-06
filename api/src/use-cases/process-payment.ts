@@ -7,7 +7,7 @@ import type {
 } from "../services/payment-queue.service";
 import type { Job } from "bullmq";
 import { UseCase } from "../shared/use-case";
-import { RedisPaymentRepository } from "../repositories/payment-repository";
+import type { PaymentRepository } from "../repositories/payment-repository";
 
 export type ProcessPaymentRequest = Job<PaymentJobData>;
 
@@ -15,7 +15,7 @@ export type ProcessPaymentResponse = void;
 
 export interface ProcessPaymentDeps {
   paymentQueueService: PaymentQueueService;
-  redisPaymentRepository: RedisPaymentRepository;
+  paymentRepository: PaymentRepository;
   paymentProcessorGateway: PaymentProcessorGateway;
   logger: FastifyBaseLogger;
 }
@@ -26,13 +26,13 @@ export class ProcessPayment extends UseCase<
 > {
   serviceName = "process-payment";
   private readonly paymentQueueService: ProcessPaymentDeps["paymentQueueService"];
-  private readonly redisPaymentRepository: ProcessPaymentDeps["redisPaymentRepository"];
+  private readonly paymentRepository: ProcessPaymentDeps["paymentRepository"];
   private readonly paymentProcessorGateway: ProcessPaymentDeps["paymentProcessorGateway"];
 
   constructor(deps: ProcessPaymentDeps) {
     super(deps.logger);
     this.paymentQueueService = deps.paymentQueueService;
-    this.redisPaymentRepository = deps.redisPaymentRepository;
+    this.paymentRepository = deps.paymentRepository;
     this.paymentProcessorGateway = deps.paymentProcessorGateway;
   }
 
@@ -48,9 +48,7 @@ export class ProcessPayment extends UseCase<
       preferredHost = "default",
     } = job.data;
     const existentPayment =
-      await this.redisPaymentRepository.getPaymentByCorrelationId(
-        correlationId
-      );
+      await this.paymentRepository.getPaymentByCorrelationId(correlationId);
     if (!existentPayment) {
       instrumentation.logErrorOccurred(
         new Error("Payment not found"),
@@ -102,7 +100,7 @@ export class ProcessPayment extends UseCase<
       // If not the last attempt, let BullMQ handle the retry using the backoff strategy
       throw error;
     }
-    await this.redisPaymentRepository.updatePaymentProcessor(
+    await this.paymentRepository.updatePaymentProcessor(
       correlationId,
       preferredHost
     );

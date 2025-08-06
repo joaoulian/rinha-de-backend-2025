@@ -4,7 +4,7 @@ import type { IInstrumentation } from "../shared/instrumentation";
 import { UseCase } from "../shared/use-case";
 import { Either, failure, success } from "../shared/either";
 import { Cents } from "../shared/cents";
-import { RedisPaymentRepository } from "../repositories/payment-repository";
+import type { PaymentRepository } from "../repositories/payment-repository";
 
 export interface CreatePaymentRequest {
   correlationId: string;
@@ -20,7 +20,7 @@ export type CreatePaymentResponse = Either<
 
 export interface CreatePaymentDeps {
   paymentQueueService: PaymentQueueService;
-  redisPaymentRepository: RedisPaymentRepository;
+  paymentRepository: PaymentRepository;
   logger: FastifyBaseLogger;
 }
 
@@ -30,12 +30,12 @@ export class CreatePayment extends UseCase<
 > {
   serviceName = "create-payment";
   private readonly paymentQueueService: CreatePaymentDeps["paymentQueueService"];
-  private readonly redisPaymentRepository: CreatePaymentDeps["redisPaymentRepository"];
+  private readonly paymentRepository: CreatePaymentDeps["paymentRepository"];
 
   constructor(deps: CreatePaymentDeps) {
     super(deps.logger);
     this.paymentQueueService = deps.paymentQueueService;
-    this.redisPaymentRepository = deps.redisPaymentRepository;
+    this.paymentRepository = deps.paymentRepository;
   }
 
   async run(
@@ -43,9 +43,7 @@ export class CreatePayment extends UseCase<
     { correlationId, amount }: CreatePaymentRequest
   ): Promise<CreatePaymentResponse> {
     const existentPayment =
-      await this.redisPaymentRepository.getPaymentByCorrelationId(
-        correlationId
-      );
+      await this.paymentRepository.getPaymentByCorrelationId(correlationId);
     if (existentPayment) {
       instrumentation.logWarning("Payment already exists");
       return failure({ error: "Payment already exists" });
@@ -56,7 +54,7 @@ export class CreatePayment extends UseCase<
       requestedAt: new Date(),
     };
     instrumentation.logDebug("Creating payment record", { paymentData });
-    await this.redisPaymentRepository.createPayment({
+    await this.paymentRepository.createPayment({
       ...paymentData,
       amountInCents: paymentData.amountInCents.value,
     });

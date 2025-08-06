@@ -1,12 +1,11 @@
 # Rinha de Backend 2025 💸
 
-Intermediador de pagamentos desenvolvido para a [Rinha de Backend 2025](https://github.com/zanfranceschi/rinha-de-backend-2025), utilizando Node.js, TypeScript, PostgreSQL e Redis.
+Intermediador de pagamentos desenvolvido para a [Rinha de Backend 2025](https://github.com/zanfranceschi/rinha-de-backend-2025), utilizando Node.js, TypeScript e Redis.
 
 ## 🚀 Tecnologias Utilizadas
 
 - **Node.js 22** - Runtime JavaScript
 - **TypeScript 5.5** - Superset do JavaScript com tipagem estática
-- **PostgreSQL** - Banco de dados relacional principal
 - **Redis 7** - Cache em memória e broker de mensagens
 - **BullMQ 5.56** - Sistema de filas baseado em Redis
 - **Nginx** - Load balancer e proxy reverso
@@ -19,7 +18,6 @@ O projeto segue uma arquitetura com:
 - **Worker**: Processamento assíncrono de pagamentos
 - **Load Balancer**: Nginx para distribuição de carga
 - **Cache**: Redis para otimização de performance
-- **Banco de Dados**: PostgreSQL com migrações automáticas
 - **Processadores de Pagamento**: Serviços externos simulando processadores de pagamentos
   <img width="965" height="532" alt="image" src="https://github.com/user-attachments/assets/26a468da-141c-46e4-aeaf-8f4d5c5abee2" />
 
@@ -28,7 +26,7 @@ O projeto segue uma arquitetura com:
 ### Pré-requisitos
 
 - Docker e Docker Compose instalados
-- Portas 9999, 5482 e 6379 disponíveis
+- Portas 9999 e 6379 disponíveis
 
 ### 1. Executar os Processadores de Pagamento
 
@@ -71,9 +69,6 @@ pnpm install
 # Configurar variáveis de ambiente
 cp .env.example .env
 
-# Executar migrações do banco
-pnpm db:migrate
-
 # Iniciar em modo de desenvolvimento
 pnpm dev
 
@@ -92,13 +87,11 @@ pnpm format
 ```
 ├── api/                          # Aplicação Node.js
 │   ├── src/
-│   │   ├── db/                   # Configuração do banco de dados
-│   │   │   ├── migrations/       # Migrações do Drizzle
-│   │   │   ├── repositories/     # Repositórios de dados
-│   │   │   └── schema/           # Esquemas do banco
 │   │   ├── gateways/             # Integrações externas
 │   │   ├── plugins/              # Plugins do Fastify
 │   │   ├── queues/               # Sistema de filas
+│   │   ├── repositories/         # Repositórios de dados
+│   │   │   └── implementations/  # Implementações concretas dos repositórios
 │   │   ├── routes/               # Rotas da API
 │   │   ├── services/             # Serviços de domínio
 │   │   ├── shared/               # Utilitários compartilhados
@@ -108,7 +101,6 @@ pnpm format
 │   │   ├── index.ts              # Entrada da API
 │   │   └── worker.ts             # Entrada do worker
 │   ├── Dockerfile                # Container da aplicação
-│   ├── Dockerfile.migration      # Container para migrações
 │   └── package.json              # Dependências do projeto
 ├── containerization/             # Configuração Docker
 │   ├── docker-compose.yml        # Orquestração principal
@@ -123,11 +115,9 @@ pnpm format
 
 - **api1** e **api2**: Instâncias da API principal
 - **worker**: Processamento assíncrono de pagamentos
-- **migration**: Execução automática de migrações
 
 ### Infraestrutura
 
-- **database**: PostgreSQL na porta 5482
 - **cache**: Redis na porta 6379
 - **nginx**: Load balancer na porta 9999
 
@@ -140,7 +130,7 @@ pnpm format
 
 1. **Recebimento**: API recebe solicitação de pagamento
 2. **Validação**: Dados são validados com Zod
-3. **Persistência**: Pagamento é salvo no PostgreSQL
+3. **Persistência**: Pagamento é salvo no Redis
 4. **Enfileiramento**: Pagamento é adicionado à fila Redis
 5. **Processamento**: Worker processa o pagamento assincronamente
 6. **Integração**: Chamada para processadores externos
@@ -203,7 +193,6 @@ Nova Tentativa de Processamento
 O projeto está disponível no Docker Hub com imagens pré-construídas:
 
 - **API**: [`joaoulian/rinha-backend-2025-api`](https://hub.docker.com/r/joaoulian/rinha-backend-2025-api)
-- **Migration**: [`joaoulian/rinha-backend-2025-migration`](https://hub.docker.com/r/joaoulian/rinha-backend-2025-migration)
 
 ### Build e Push das Imagens
 
@@ -267,9 +256,6 @@ docker compose -f ./containerization/docker-compose.dev.yml down
 
 # Limpar volumes (dados serão perdidos)
 docker compose -f ./containerization/docker-compose.yml down -v
-
-# Executar migração manualmente
-docker compose -f ./containerization/docker-compose.yml run --rm migration
 
 # Acessar shell do container da API
 docker compose -f ./containerization/docker-compose.yml exec api1 sh

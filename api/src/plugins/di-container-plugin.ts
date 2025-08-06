@@ -3,9 +3,10 @@ import type {
   FastifyInstance,
   FastifyPluginAsync,
 } from "fastify";
+import fp from "fastify-plugin";
 import { diContainer, fastifyAwilixPlugin } from "@fastify/awilix";
 import { asClass, asValue } from "awilix";
-import fp from "fastify-plugin";
+import Redis from "ioredis";
 import { PaymentProcessorGateway } from "../gateways/payment-processor-gateway";
 import { AppConfig } from "./config-plugin";
 import { BullMQWrapper } from "../queues/bullmq-wrapper";
@@ -13,8 +14,8 @@ import { PaymentQueueService } from "../services/payment-queue.service";
 import { HostHealthCacheService } from "../services/host-health-cache.service";
 import { CreatePayment } from "../use-cases/create-payment";
 import { ProcessPayment } from "../use-cases/process-payment";
-import Redis from "ioredis";
-import { RedisPaymentRepository } from "../repositories/payment-repository";
+import { type PaymentRepository } from "../repositories/payment-repository";
+import { PaymentRepositoryFactory } from "../repositories/implementations/payment-repository-factory";
 
 declare module "@fastify/awilix" {
   interface Cradle {
@@ -27,7 +28,7 @@ declare module "@fastify/awilix" {
     paymentQueueService: PaymentQueueService;
     createPayment: CreatePayment;
     processPayment: ProcessPayment;
-    redisPaymentRepository: RedisPaymentRepository;
+    paymentRepository: PaymentRepository;
   }
 }
 
@@ -39,6 +40,10 @@ const diContainerPlugin: FastifyPluginAsync = async (
     disposeOnClose: true,
     disposeOnResponse: true,
   });
+  const paymentRepository = PaymentRepositoryFactory.create("redis", {
+    redis: fastify.redis,
+    logger: fastify.log,
+  });
   diContainer.register({
     appConfig: asValue(fastify.appConfig),
     logger: asValue(fastify.log),
@@ -49,7 +54,7 @@ const diContainerPlugin: FastifyPluginAsync = async (
     paymentQueueService: asClass(PaymentQueueService).singleton(),
     createPayment: asClass(CreatePayment).singleton(),
     processPayment: asClass(ProcessPayment).singleton(),
-    redisPaymentRepository: asClass(RedisPaymentRepository).singleton(),
+    paymentRepository: asValue(paymentRepository),
   });
   fastify.log.info("DI Container plugin registered successfully");
 };

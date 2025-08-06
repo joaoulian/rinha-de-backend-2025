@@ -53,16 +53,15 @@ const routes: FastifyPluginCallback = (fastify, _options, done) => {
     },
     handler: async function (request, reply) {
       const { from, to } = request.query;
-      const redisPaymentRepository = fastify.diContainer.resolve(
-        "redisPaymentRepository"
-      );
+      const paymentRepository =
+        fastify.diContainer.resolve("paymentRepository");
       const query = {
         from: from ? new Date(from) : undefined,
         to: to ? new Date(to) : undefined,
       };
       const [defaultSummary, fallbackSummary] = await Promise.all([
-        redisPaymentRepository.getPaymentSummaryByProcessor("default", query),
-        redisPaymentRepository.getPaymentSummaryByProcessor("fallback", query),
+        paymentRepository.getPaymentSummaryByProcessor("default", query),
+        paymentRepository.getPaymentSummaryByProcessor("fallback", query),
       ]);
       return reply.status(200).send({
         default: {
