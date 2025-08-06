@@ -58,8 +58,8 @@ docker compose -f ./containerization/docker-compose.yml logs -f worker
 ### 4. Testar a API
 
 ```bash
-# Health check
-curl http://localhost:9999/health
+# Resumo dos pagamentos
+curl http://localhost:9999/payments-summary
 
 # Criar um pagamento
 curl -X POST http://localhost:9999/payments \
@@ -158,6 +158,66 @@ pnpm format
 5. **Processamento**: Worker processa o pagamento assincronamente
 6. **Integração**: Chamada para processadores externos
 7. **Atualização**: Status do pagamento é atualizado
+
+## 🔄 Estratégia de Retry e Failover
+
+O sistema implementa uma estratégia robusta de retry e failover para garantir alta disponibilidade no processamento de pagamentos:
+
+### Cache de Status dos Processadores (Redis)
+
+- **Cache TTL**: 5 segundos para informações de saúde dos processadores
+- **Dados Armazenados**:
+  - `failing`: Status de falha do processador
+  - `minResponseTime`: Tempo mínimo de resposta
+  - `cachedAt`: Timestamp do cache
+
+### Seleção Inteligente de Processador
+
+1. **Verificação de Saúde**: Consulta simultânea aos dois processadores
+2. **Priorização**: Processador padrão tem prioridade se estiver saudável
+3. **Fallback Automático**: Usa processador de fallback se o padrão falhar
+4. **Cache Otimizado**: Evita consultas desnecessárias usando Redis
+
+### Estratégia de Retry em Múltiplas Camadas
+
+#### Camada 1: BullMQ (Retry Imediato)
+
+- **Tentativas**: Configurável por job
+- **Backoff**: Estratégia exponencial
+- **Mesmo Host**: Mantém o processador original
+
+#### Camada 2: Troca de Processador (Retry Inteligente)
+
+- **Ativação**: Após esgotar tentativas do BullMQ
+- **Troca de Host**: Alterna entre default ↔ fallback
+- **Delay Inteligente**: Aguarda `minResponseTime` do novo processador
+- **Requeue**: Adiciona novo job na fila com prioridade mantida
+
+### Fluxo de Retry Detalhado
+
+```
+Pagamento Falha
+       ↓
+BullMQ Retry (mesmo host)
+       ↓
+Tentativas Esgotadas?
+       ↓
+Consulta Saúde do Outro Host
+       ↓
+Agenda Retry com Novo Host
+       ↓
+Delay = minResponseTime
+       ↓
+Nova Tentativa de Processamento
+```
+
+### Benefícios da Estratégia
+
+- **Alta Disponibilidade**: Failover automático entre processadores
+- **Performance**: Cache Redis reduz latência de verificações
+- **Resiliência**: Múltiplas camadas de retry
+- **Inteligência**: Delay baseado no tempo de resposta real
+- **Observabilidade**: Logs detalhados de cada tentativa
 
 ## 🛠️ Comandos Úteis
 
