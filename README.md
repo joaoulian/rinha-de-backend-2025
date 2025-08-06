@@ -19,7 +19,8 @@ O projeto segue uma arquitetura com:
 - **Load Balancer**: Nginx para distribuição de carga
 - **Cache**: Redis para otimização de performance
 - **Processadores de Pagamento**: Serviços externos simulando processadores de pagamentos
-  <img width="965" height="532" alt="image" src="https://github.com/user-attachments/assets/26a468da-141c-46e4-aeaf-8f4d5c5abee2" />
+<img width="965" height="532" alt="image" src="https://github.com/user-attachments/assets/e5e41933-b19f-440c-9492-50eb883ed177" />
+
 
 ## 🚀 Como Executar o Projeto
 
