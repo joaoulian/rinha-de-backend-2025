@@ -57,6 +57,7 @@ services:
 
   migration:
     image: joaoulian/rinha-backend-2025-migration:latest
+    command: pnpm db:migrate
     networks:
       - backend
     environment:

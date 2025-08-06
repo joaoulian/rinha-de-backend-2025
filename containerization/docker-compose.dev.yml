@@ -63,6 +63,7 @@ services:
     build:
       context: ../api
       dockerfile: Dockerfile.migration
+    command: pnpm db:migrate
     networks:
       - backend
     environment:
