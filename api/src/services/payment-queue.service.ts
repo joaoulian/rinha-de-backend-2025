@@ -61,7 +61,6 @@ export class PaymentQueueService {
           type: "exponential",
           delay: 2000,
         },
-        jobId: paymentData.correlationId,
       }
     );
     this.logger.info(
