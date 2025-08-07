@@ -6,7 +6,7 @@ import type { Host } from "../gateways/payment-processor-gateway";
 export interface PaymentJobData {
   correlationId: string;
   amount: number;
-  requestedAt: Date;
+  requestedAt: string;
   retryCount?: number;
   preferredHost?: Host;
 }
@@ -49,20 +49,19 @@ export class PaymentQueueService {
   }
 
   async queuePayment(
-    paymentData: Omit<PaymentJobData, "retryCount">,
-    priority: number
+    paymentData: Omit<PaymentJobData, "retryCount">
   ): Promise<string> {
     const job = await this.bullMQWrapper.addJob(
       this.PAYMENT_QUEUE,
       this.PAYMENT_JOB,
       paymentData,
       {
-        priority,
         attempts: 3,
         backoff: {
           type: "exponential",
           delay: 2000,
         },
+        jobId: paymentData.correlationId,
       }
     );
     this.logger.info(
@@ -74,7 +73,6 @@ export class PaymentQueueService {
 
   async scheduleRetryPayment(
     paymentData: PaymentJobData,
-    priority: number,
     delayMs: number
   ): Promise<string> {
     const job = await this.bullMQWrapper.addJob(
@@ -83,7 +81,6 @@ export class PaymentQueueService {
       paymentData,
       {
         delay: delayMs,
-        priority,
         attempts: 2, // Fewer attempts for retries
         backoff: {
           type: "fixed",

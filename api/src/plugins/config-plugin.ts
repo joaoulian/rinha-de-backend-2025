@@ -4,7 +4,7 @@ import fp from "fastify-plugin";
 import { z } from "zod";
 
 const environmentConfigSchema = z.object({
-  PORT: z.coerce.number().default(3004),
+  PORT: z.coerce.number().default(3000),
   NODE_ENV: z
     .enum(["local", "development", "production", "test"])
     .default("development"),

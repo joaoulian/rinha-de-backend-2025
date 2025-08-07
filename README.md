@@ -8,7 +8,7 @@ Intermediador de pagamentos desenvolvido para a [Rinha de Backend 2025](https://
 - **TypeScript** - Superset do JavaScript com tipagem estática
 - **Redis 7** - Cache em memória e broker de mensagens
 - **BullMQ** - Sistema de filas baseado em Redis
-- **Nginx** - Load balancer e proxy reverso
+- **HAProxy** - Load balancer de alta performance
 
 ## 🏗️ Arquitetura
 
@@ -111,7 +111,7 @@ pnpm format
 
 ## 🚦 Serviços
 
-### API (Portas 9999)
+### API (Porta Externa 9999)
 
 - **api1** e **api2**: Instâncias da API principal
 - **worker**: Processamento assíncrono de pagamentos
@@ -119,7 +119,7 @@ pnpm format
 ### Infraestrutura
 
 - **cache**: Redis na porta 6379
-- **nginx**: Load balancer na porta 9999
+- **haproxy**: Load balancer na porta 9999 (stats na 8404)
 
 ### Processadores de Pagamento
 

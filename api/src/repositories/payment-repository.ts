@@ -24,7 +24,7 @@ export interface PaymentData {
 }
 
 export interface PaymentRepository {
-  createPayment(input: CreatePaymentInput): Promise<void>;
+  createPayment(input: CreatePaymentInput): Promise<PaymentData>;
   getPaymentByCorrelationId(correlationId: string): Promise<PaymentData | null>;
   getPaymentSummaryByProcessor(
     processor: "fallback" | "default",

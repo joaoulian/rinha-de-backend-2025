@@ -16,4 +16,4 @@ COPY --from=builder /app/package*.json ./
 RUN chown -R www-data:www-data /tmp
 USER www-data
 ENV NODE_ENV=production
-EXPOSE 9999
+EXPOSE 3000

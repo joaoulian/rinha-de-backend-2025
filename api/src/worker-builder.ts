@@ -50,7 +50,7 @@ export class WorkerBuilder {
       };
     }
     return {
-      level: process.env["LOG_LEVEL"] || "info",
+      level: "error",
       messageKey: "message",
     };
   }

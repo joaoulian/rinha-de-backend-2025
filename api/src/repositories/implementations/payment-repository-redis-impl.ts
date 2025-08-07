@@ -31,7 +31,7 @@ export class PaymentRepositoryRedisImpl implements PaymentRepository {
     this.logger = deps.logger;
   }
 
-  async createPayment(input: CreatePaymentInput): Promise<void> {
+  async createPayment(input: CreatePaymentInput): Promise<PaymentData> {
     try {
       const paymentData: PaymentData = {
         correlationId: input.correlationId,
@@ -67,6 +67,7 @@ export class PaymentRepositoryRedisImpl implements PaymentRepository {
         },
         "Payment record created in Redis"
       );
+      return paymentData;
     } catch (error) {
       this.logger.error(
         { error, correlationId: input.correlationId },

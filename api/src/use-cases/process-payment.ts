@@ -1,13 +1,20 @@
 import type { FastifyBaseLogger } from "fastify";
 import type { IInstrumentation } from "../shared/instrumentation";
-import type { PaymentProcessorGateway } from "../gateways/payment-processor-gateway";
+import type {
+  Host,
+  PaymentProcessorGateway,
+} from "../gateways/payment-processor-gateway";
 import type {
   PaymentJobData,
   PaymentQueueService,
 } from "../services/payment-queue.service";
 import type { Job } from "bullmq";
 import { UseCase } from "../shared/use-case";
-import type { PaymentRepository } from "../repositories/payment-repository";
+import type {
+  PaymentData,
+  PaymentRepository,
+} from "../repositories/payment-repository";
+import { Cents } from "../shared/cents";
 
 export type ProcessPaymentRequest = Job<PaymentJobData>;
 
@@ -43,66 +50,102 @@ export class ProcessPayment extends UseCase<
     const {
       correlationId,
       amount,
-      requestedAt,
+      requestedAt: rawRequestedAt,
       retryCount = 0,
       preferredHost = "default",
     } = job.data;
-    const existentPayment =
-      await this.paymentRepository.getPaymentByCorrelationId(correlationId);
-    if (!existentPayment) {
-      instrumentation.logErrorOccurred(
-        new Error("Payment not found"),
-        "Payment not found"
-      );
-      return;
-    }
-    if (existentPayment.processor) {
+    const requestedAt = new Date(rawRequestedAt);
+    const payment = await this.getOrCreatePayment(
+      instrumentation,
+      correlationId,
+      amount,
+      requestedAt
+    );
+    if (payment.processor) {
       instrumentation.logDebug("Payment already processed");
       return;
     }
-    instrumentation.logDebug(
-      `Processing payment job ${job.id} for ${correlationId}`
+    const { processed } = await this.processPayment(
+      instrumentation,
+      job,
+      payment,
+      preferredHost,
+      retryCount
     );
-    try {
-      await this.paymentProcessorGateway.processPayment(
-        {
-          correlationId,
-          amount,
-          requestedAt: new Date(requestedAt),
-        },
-        preferredHost
-      );
-      instrumentation.logDebug("Payment processed successfully", {
-        jobId: job.id,
-        correlationId,
-        host: preferredHost,
-      });
-    } catch (error) {
-      instrumentation.logErrorOccurred(error, "Payment processing failed");
-      const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 0) - 1;
-      if (isLastAttempt) {
-        const otherHost = preferredHost === "default" ? "fallback" : "default";
-        instrumentation.logDebug(`Retrying payment with ${otherHost} host`);
-        const health = await this.paymentProcessorGateway.checkHealth(
-          otherHost
-        );
-        await this.paymentQueueService.scheduleRetryPayment(
-          {
-            ...job.data,
-            retryCount: retryCount + 1,
-            preferredHost: otherHost,
-          },
-          job.priority,
-          health.minResponseTime // Retry after the minimum response time
-        );
-        return;
-      }
-      // If not the last attempt, let BullMQ handle the retry using the backoff strategy
-      throw error;
+    if (!processed) {
+      return;
     }
     await this.paymentRepository.updatePaymentProcessor(
       correlationId,
       preferredHost
     );
+  }
+
+  private async getOrCreatePayment(
+    instrumentation: IInstrumentation,
+    correlationId: string,
+    amount: number,
+    requestedAt: Date
+  ): Promise<PaymentData> {
+    let existentPayment =
+      await this.paymentRepository.getPaymentByCorrelationId(correlationId);
+    if (existentPayment) {
+      return existentPayment;
+    }
+    const paymentData = {
+      correlationId,
+      amountInCents: Cents.fromFloat(amount),
+      requestedAt,
+    };
+    instrumentation.logDebug("Creating payment record", { paymentData });
+    const createdPayment = await this.paymentRepository.createPayment({
+      ...paymentData,
+      amountInCents: paymentData.amountInCents.value,
+    });
+    instrumentation.logDebug("Payment record created");
+    return createdPayment;
+  }
+
+  private async processPayment(
+    instrumentation: IInstrumentation,
+    job: ProcessPaymentRequest,
+    payment: PaymentData,
+    preferredHost: Host,
+    retryCount: number
+  ): Promise<{ processed: boolean }> {
+    instrumentation.logDebug(
+      `Processing payment job ${job.id} for ${payment.correlationId}`
+    );
+    try {
+      await this.paymentProcessorGateway.processPayment(
+        {
+          correlationId: payment.correlationId,
+          amount: Cents.create(payment.amountInCents).toFloat(),
+          requestedAt: new Date(payment.requestedAt),
+        },
+        preferredHost
+      );
+      instrumentation.logDebug("Payment processed successfully", {
+        jobId: job.id,
+        correlationId: payment.correlationId,
+        host: preferredHost,
+      });
+      return { processed: true };
+    } catch (error) {
+      instrumentation.logErrorOccurred(error, "Payment processing failed");
+      const otherHost = preferredHost === "default" ? "fallback" : "default";
+      instrumentation.logDebug(`Retrying payment with ${otherHost} host`);
+      const health = await this.paymentProcessorGateway.checkHealth(otherHost);
+      instrumentation.logDebug("Retrying payment with other host");
+      await this.paymentQueueService.scheduleRetryPayment(
+        {
+          ...job.data,
+          retryCount: retryCount + 1,
+          preferredHost: otherHost,
+        },
+        health.minResponseTime // Retry after the minimum response time
+      );
+      return { processed: false };
+    }
   }
 }
