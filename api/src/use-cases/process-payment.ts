@@ -133,19 +133,25 @@ export class ProcessPayment extends UseCase<
       return { processed: true };
     } catch (error) {
       instrumentation.logErrorOccurred(error, "Payment processing failed");
-      const otherHost = preferredHost === "default" ? "fallback" : "default";
-      instrumentation.logDebug(`Retrying payment with ${otherHost} host`);
-      const health = await this.paymentProcessorGateway.checkHealth(otherHost);
-      instrumentation.logDebug("Retrying payment with other host");
-      await this.paymentQueueService.scheduleRetryPayment(
-        {
-          ...job.data,
-          retryCount: retryCount + 1,
-          preferredHost: otherHost,
-        },
-        health.minResponseTime // Retry after the minimum response time
-      );
-      return { processed: false };
+      const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 0) - 1;
+      if (isLastAttempt) {
+        const otherHost = preferredHost === "default" ? "fallback" : "default";
+        instrumentation.logDebug(`Retrying payment with ${otherHost} host`);
+        const health = await this.paymentProcessorGateway.checkHealth(
+          otherHost
+        );
+        await this.paymentQueueService.scheduleRetryPayment(
+          {
+            ...job.data,
+            retryCount: retryCount + 1,
+            preferredHost: otherHost,
+          },
+          health.minResponseTime // Retry after the minimum response time
+        );
+        return { processed: false };
+      }
+      // If not the last attempt, let BullMQ handle the retry using the backoff strategy
+      throw error;
     }
   }
 }
