@@ -59,6 +59,17 @@ export class PaymentProcessorGateway {
     }
   }
 
+  async quickCheckHealth(host: Host = "default"): Promise<boolean> {
+    const cachedHealth = await this.hostHealthCacheService.getCachedHealth(
+      host
+    );
+    if (cachedHealth) {
+      return !cachedHealth.failing;
+    }
+    void this.checkHealth(host);
+    return false;
+  }
+
   async checkHealth(
     host: Host = "default"
   ): Promise<{ failing: boolean; minResponseTime: number }> {

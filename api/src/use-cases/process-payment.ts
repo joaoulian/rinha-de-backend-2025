@@ -65,6 +65,7 @@ export class ProcessPayment extends UseCase<
       instrumentation.logDebug("Payment already processed");
       return;
     }
+    await this.failIfHostIsFailing(job, preferredHost);
     const { processed } = await this.processPayment(
       instrumentation,
       job,
@@ -79,6 +80,22 @@ export class ProcessPayment extends UseCase<
       correlationId,
       preferredHost
     );
+  }
+
+  private async failIfHostIsFailing(
+    job: ProcessPaymentRequest,
+    host: Host
+  ): Promise<void> {
+    const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 0) - 1;
+    if (isLastAttempt) {
+      // If it's the last attempt, we don't want to retry, so we don't check the health
+      return;
+    }
+    const health = await this.paymentProcessorGateway.quickCheckHealth(host);
+    if (!health) {
+      throw new Error(`Host ${host} is failing`);
+    }
+    return;
   }
 
   private async getOrCreatePayment(
@@ -128,7 +145,7 @@ export class ProcessPayment extends UseCase<
       instrumentation.logDebug("Payment processed successfully", {
         jobId: job.id,
         correlationId: payment.correlationId,
-        host: preferredHost,
+        preferredHost,
       });
       return { processed: true };
     } catch (error) {
