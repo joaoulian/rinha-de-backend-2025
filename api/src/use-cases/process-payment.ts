@@ -65,7 +65,6 @@ export class ProcessPayment extends UseCase<
       instrumentation.logDebug("Payment already processed");
       return;
     }
-    await this.failIfHostIsFailing(job, preferredHost);
     const { processed } = await this.processPayment(
       instrumentation,
       job,
@@ -80,22 +79,6 @@ export class ProcessPayment extends UseCase<
       correlationId,
       preferredHost
     );
-  }
-
-  private async failIfHostIsFailing(
-    job: ProcessPaymentRequest,
-    host: Host
-  ): Promise<void> {
-    const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 0) - 1;
-    if (isLastAttempt) {
-      // If it's the last attempt, we don't want to retry, so we don't check the health
-      return;
-    }
-    const health = await this.paymentProcessorGateway.quickCheckHealth(host);
-    if (!health) {
-      throw new Error(`Host ${host} is failing`);
-    }
-    return;
   }
 
   private async getOrCreatePayment(
@@ -133,6 +116,12 @@ export class ProcessPayment extends UseCase<
     instrumentation.logDebug(
       `Processing payment job ${job.id} for ${payment.correlationId}`
     );
+    const health = await this.paymentProcessorGateway.quickCheckHealth(
+      preferredHost
+    );
+    const host = health
+      ? preferredHost
+      : ((preferredHost === "default" ? "fallback" : "default") as Host);
     try {
       await this.paymentProcessorGateway.processPayment(
         {
@@ -140,35 +129,28 @@ export class ProcessPayment extends UseCase<
           amount: Cents.create(payment.amountInCents).toFloat(),
           requestedAt: new Date(payment.requestedAt),
         },
-        preferredHost
+        host
       );
       instrumentation.logDebug("Payment processed successfully", {
         jobId: job.id,
         correlationId: payment.correlationId,
-        preferredHost,
+        host,
       });
       return { processed: true };
     } catch (error) {
       instrumentation.logErrorOccurred(error, "Payment processing failed");
-      const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 0) - 1;
-      if (isLastAttempt) {
-        const otherHost = preferredHost === "default" ? "fallback" : "default";
-        instrumentation.logDebug(`Retrying payment with ${otherHost} host`);
-        const health = await this.paymentProcessorGateway.checkHealth(
-          otherHost
-        );
-        await this.paymentQueueService.scheduleRetryPayment(
-          {
-            ...job.data,
-            retryCount: retryCount + 1,
-            preferredHost: otherHost,
-          },
-          health.minResponseTime // Retry after the minimum response time
-        );
-        return { processed: false };
-      }
-      // If not the last attempt, let BullMQ handle the retry using the backoff strategy
-      throw error;
+      const otherHost = host === "default" ? "fallback" : "default";
+      instrumentation.logDebug(`Retrying payment with ${otherHost} host`);
+      const health = await this.paymentProcessorGateway.checkHealth(otherHost);
+      await this.paymentQueueService.scheduleRetryPayment(
+        {
+          ...job.data,
+          retryCount: retryCount + 1,
+          preferredHost: otherHost,
+        },
+        health.failing ? health.minResponseTime : 0
+      );
+      return { processed: false };
     }
   }
 }

@@ -9,6 +9,7 @@ services:
     environment:
       - PORT=3000
       - REDIS_URL=redis://cache:6379
+      - NODE_ENV=production
     networks:
       - backend
       - payment-processor
@@ -33,6 +34,7 @@ services:
       - REDIS_URL=redis://cache:6379
       - PROCESSOR_DEFAULT_URL=http://payment-processor-default:8080
       - PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
+      - NODE_ENV=production
     networks:
       - backend
       - payment-processor
