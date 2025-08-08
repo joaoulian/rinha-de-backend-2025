@@ -2,7 +2,7 @@ export interface CreatePaymentInput {
   correlationId: string;
   amountInCents: number;
   requestedAt: Date;
-  processor?: "default" | "fallback";
+  processor: "default" | "fallback";
 }
 
 export interface PaymentSummaryQuery {
@@ -10,29 +10,24 @@ export interface PaymentSummaryQuery {
   to?: Date;
 }
 
-export interface PaymentSummary {
+export interface Summary {
   totalRequests: number;
   totalAmount: number;
+}
+
+export interface PaymentSummary {
+  default: Summary;
+  fallback: Summary;
 }
 
 export interface PaymentData {
   correlationId: string;
   amountInCents: number;
   requestedAt: Date;
-  processor?: "default" | "fallback";
-  createdAt: Date;
+  processor: "default" | "fallback";
 }
 
 export interface PaymentRepository {
   createPayment(input: CreatePaymentInput): Promise<PaymentData>;
-  getPaymentByCorrelationId(correlationId: string): Promise<PaymentData | null>;
-  getPaymentSummaryByProcessor(
-    processor: "fallback" | "default",
-    query?: PaymentSummaryQuery
-  ): Promise<PaymentSummary>;
-  updatePaymentProcessor(
-    correlationId: string,
-    processor: "fallback" | "default"
-  ): Promise<boolean>;
-  clearAllPayments?(): Promise<void>;
+  getPaymentSummary(query?: PaymentSummaryQuery): Promise<PaymentSummary>;
 }

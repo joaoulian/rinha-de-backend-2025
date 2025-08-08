@@ -59,18 +59,15 @@ const routes: FastifyPluginCallback = (fastify, _options, done) => {
         from: from ? new Date(from) : undefined,
         to: to ? new Date(to) : undefined,
       };
-      const [defaultSummary, fallbackSummary] = await Promise.all([
-        paymentRepository.getPaymentSummaryByProcessor("default", query),
-        paymentRepository.getPaymentSummaryByProcessor("fallback", query),
-      ]);
+      const summary = await paymentRepository.getPaymentSummary(query);
       return reply.status(200).send({
         default: {
-          totalRequests: defaultSummary.totalRequests,
-          totalAmount: Cents.create(defaultSummary.totalAmount).toFloat(),
+          totalRequests: summary.default.totalRequests,
+          totalAmount: Cents.create(summary.default.totalAmount).toFloat(),
         },
         fallback: {
-          totalRequests: fallbackSummary.totalRequests,
-          totalAmount: Cents.create(fallbackSummary.totalAmount).toFloat(),
+          totalRequests: summary.fallback.totalRequests,
+          totalAmount: Cents.create(summary.fallback.totalAmount).toFloat(),
         },
       });
     },

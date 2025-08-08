@@ -26,8 +26,8 @@ export class PaymentProcessorGateway {
 
   constructor(deps: PaymentProcessorGatewayDeps) {
     this.serverUrls = {
-      ["default"]: deps.appConfig.PROCESSOR_DEFAULT_URL,
-      ["fallback"]: deps.appConfig.PROCESSOR_FALLBACK_URL,
+      default: deps.appConfig.PROCESSOR_DEFAULT_URL,
+      fallback: deps.appConfig.PROCESSOR_FALLBACK_URL,
     };
     this.logger = deps.logger;
     this.hostHealthCacheService = deps.hostHealthCacheService;
@@ -41,7 +41,7 @@ export class PaymentProcessorGateway {
       this.logger.info(
         `Processing payment: ${JSON.stringify(input)}, host: ${host}`
       );
-      await axios.post<ProcessPaymentInput>(
+      const response = await axios.post<ProcessPaymentInput>(
         this.getHostUrl(host) + "/payments",
         {
           amount: input.amount,
@@ -49,6 +49,9 @@ export class PaymentProcessorGateway {
           requestedAt: input.requestedAt.toISOString(),
         }
       );
+      if (response.status !== 200) {
+        throw new Error(`Unexpected status code: ${response.status}`);
+      }
       return;
     } catch (e: any) {
       this.logger.error(
@@ -59,15 +62,16 @@ export class PaymentProcessorGateway {
     }
   }
 
-  async quickCheckHealth(host: Host = "default"): Promise<boolean> {
+  async quickCheckIsHealthy(host: Host = "default"): Promise<boolean> {
     const cachedHealth = await this.hostHealthCacheService.getCachedHealth(
       host
     );
     if (cachedHealth) {
       return !cachedHealth.failing;
     }
-    void this.checkHealth(host);
-    return false;
+    this.checkHealth(host);
+    // If we don't have a cached health, we assume the host is healthy
+    return true;
   }
 
   async checkHealth(
@@ -110,37 +114,6 @@ export class PaymentProcessorGateway {
       return {
         failing: true,
         minResponseTime: 0,
-      };
-    }
-  }
-
-  async getBestAvailableHost(): Promise<{
-    host: Host;
-    minResponseTime: number;
-    failing: boolean;
-  }> {
-    const [defaultHealth, fallbackHealth] = await Promise.all([
-      this.checkHealth("default"),
-      this.checkHealth("fallback"),
-    ]);
-    if (!defaultHealth.failing) {
-      return {
-        host: "default",
-        minResponseTime: defaultHealth.minResponseTime,
-        failing: defaultHealth.failing,
-      };
-    } else if (!fallbackHealth.failing) {
-      return {
-        host: "fallback",
-        minResponseTime: fallbackHealth.minResponseTime,
-        failing: fallbackHealth.failing,
-      };
-    } else {
-      this.logger.warn("Both hosts appear unhealthy, using default");
-      return {
-        host: "default",
-        minResponseTime: defaultHealth.minResponseTime,
-        failing: defaultHealth.failing,
       };
     }
   }

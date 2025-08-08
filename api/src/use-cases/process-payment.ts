@@ -15,6 +15,7 @@ import type {
   PaymentRepository,
 } from "../repositories/payment-repository";
 import { Cents } from "../shared/cents";
+import { Either, failure, success } from "../shared/either";
 
 export type ProcessPaymentRequest = Job<PaymentJobData>;
 
@@ -54,89 +55,58 @@ export class ProcessPayment extends UseCase<
       retryCount = 0,
       preferredHost = "default",
     } = job.data;
-    const requestedAt = new Date(rawRequestedAt);
-    const payment = await this.getOrCreatePayment(
-      instrumentation,
-      correlationId,
-      amount,
-      requestedAt
-    );
-    if (payment.processor) {
-      instrumentation.logDebug("Payment already processed");
-      return;
-    }
-    const { processed } = await this.processPayment(
+    const processedOrFailed = await this.processPayment(
       instrumentation,
       job,
-      payment,
       preferredHost,
       retryCount
     );
-    if (!processed) {
+    if (processedOrFailed.isFailure()) {
       return;
     }
-    await this.paymentRepository.updatePaymentProcessor(
+    const host = processedOrFailed.value.host;
+    await this.paymentRepository.createPayment({
       correlationId,
-      preferredHost
-    );
-  }
-
-  private async getOrCreatePayment(
-    instrumentation: IInstrumentation,
-    correlationId: string,
-    amount: number,
-    requestedAt: Date
-  ): Promise<PaymentData> {
-    let existentPayment =
-      await this.paymentRepository.getPaymentByCorrelationId(correlationId);
-    if (existentPayment) {
-      return existentPayment;
-    }
-    const paymentData = {
-      correlationId,
-      amountInCents: Cents.fromFloat(amount),
-      requestedAt,
-    };
-    instrumentation.logDebug("Creating payment record", { paymentData });
-    const createdPayment = await this.paymentRepository.createPayment({
-      ...paymentData,
-      amountInCents: paymentData.amountInCents.value,
+      amountInCents: Cents.fromFloat(amount).value,
+      requestedAt: new Date(rawRequestedAt),
+      processor: host,
     });
-    instrumentation.logDebug("Payment record created");
-    return createdPayment;
   }
 
   private async processPayment(
     instrumentation: IInstrumentation,
     job: ProcessPaymentRequest,
-    payment: PaymentData,
     preferredHost: Host,
     retryCount: number
-  ): Promise<{ processed: boolean }> {
+  ): Promise<Either<{ host: Host }, string>> {
+    const { correlationId, amount, requestedAt: rawRequestedAt } = job.data;
+    const requestedAt = new Date(rawRequestedAt);
     instrumentation.logDebug(
-      `Processing payment job ${job.id} for ${payment.correlationId}`
+      `Processing payment job ${job.id} for ${correlationId}`
     );
-    const health = await this.paymentProcessorGateway.quickCheckHealth(
+    const isHealthy = await this.paymentProcessorGateway.quickCheckIsHealthy(
       preferredHost
     );
-    const host = health
+    const host = isHealthy
       ? preferredHost
       : ((preferredHost === "default" ? "fallback" : "default") as Host);
     try {
       await this.paymentProcessorGateway.processPayment(
         {
-          correlationId: payment.correlationId,
-          amount: Cents.create(payment.amountInCents).toFloat(),
-          requestedAt: new Date(payment.requestedAt),
+          correlationId: correlationId,
+          amount: Cents.create(amount).toFloat(),
+          requestedAt: new Date(requestedAt),
         },
         host
       );
       instrumentation.logDebug("Payment processed successfully", {
         jobId: job.id,
-        correlationId: payment.correlationId,
+        correlationId,
         host,
       });
-      return { processed: true };
+      return success({
+        host,
+      });
     } catch (error) {
       instrumentation.logErrorOccurred(error, "Payment processing failed");
       const otherHost = host === "default" ? "fallback" : "default";
@@ -150,7 +120,7 @@ export class ProcessPayment extends UseCase<
         },
         health.failing ? health.minResponseTime : 0
       );
-      return { processed: false };
+      return failure("Payment processing failed");
     }
   }
 }
