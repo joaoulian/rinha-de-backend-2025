@@ -12,8 +12,9 @@ import { AppConfig } from "./config-plugin";
 import { BullMQWrapper } from "../queues/bullmq-wrapper";
 import { PaymentQueueService } from "../services/payment-queue.service";
 import { HostHealthCacheService } from "../services/host-health-cache.service";
+import { BatchProcessorService } from "../services/batch-processor.service";
 import { CreatePayment } from "../use-cases/create-payment";
-import { ProcessPayment } from "../use-cases/process-payment";
+import { ProcessBulkPayment } from "../use-cases/process-bulk-payment";
 import { type PaymentRepository } from "../repositories/payment-repository";
 import { PaymentRepositoryFactory } from "../repositories/implementations/payment-repository-factory";
 
@@ -26,8 +27,9 @@ declare module "@fastify/awilix" {
     paymentProcessorGateway: PaymentProcessorGateway;
     bullMQWrapper: BullMQWrapper;
     paymentQueueService: PaymentQueueService;
+    batchProcessorService: BatchProcessorService;
     createPayment: CreatePayment;
-    processPayment: ProcessPayment;
+    processBulkPayment: ProcessBulkPayment;
     paymentRepository: PaymentRepository;
   }
 }
@@ -44,6 +46,12 @@ const diContainerPlugin: FastifyPluginAsync = async (
     redis: fastify.redis,
     logger: fastify.log,
   });
+  const batchProcessorConfig = {
+    batchSize: fastify.appConfig.BATCH_SIZE,
+    intervalMs: fastify.appConfig.BATCH_INTERVAL_MS,
+    enabled: fastify.appConfig.BATCH_PROCESSOR_ENABLED,
+  };
+
   diContainer.register({
     appConfig: asValue(fastify.appConfig),
     logger: asValue(fastify.log),
@@ -52,8 +60,13 @@ const diContainerPlugin: FastifyPluginAsync = async (
     paymentProcessorGateway: asClass(PaymentProcessorGateway).singleton(),
     bullMQWrapper: asClass(BullMQWrapper).singleton(),
     paymentQueueService: asClass(PaymentQueueService).singleton(),
+    batchProcessorService: asClass(BatchProcessorService)
+      .singleton()
+      .inject(() => ({
+        config: batchProcessorConfig,
+      })),
     createPayment: asClass(CreatePayment).singleton(),
-    processPayment: asClass(ProcessPayment).singleton(),
+    processBulkPayment: asClass(ProcessBulkPayment).singleton(),
     paymentRepository: asValue(paymentRepository),
   });
   fastify.log.info("DI Container plugin registered successfully");

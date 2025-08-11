@@ -11,6 +11,12 @@ export interface PaymentJobData {
   preferredHost?: Host;
 }
 
+export interface BulkPaymentJobData {
+  payments: PaymentJobData[];
+  batchId: string;
+  preferredHost?: Host;
+}
+
 export interface PaymentQueueServiceDeps {
   bullMQWrapper: BullMQWrapper;
   logger: FastifyBaseLogger;
@@ -21,29 +27,32 @@ export class PaymentQueueService {
   private readonly logger: PaymentQueueServiceDeps["logger"];
 
   private readonly PAYMENT_QUEUE = "payments";
+  private readonly BULK_PAYMENT_QUEUE = "bulk-payments";
   private readonly PAYMENT_JOB = "process-payment";
-  private readonly RETRY_PAYMENT_JOB = "retry-payment";
+  private readonly BULK_PAYMENT_JOB = "process-bulk-payment";
 
   constructor(deps: PaymentQueueServiceDeps) {
     this.bullMQWrapper = deps.bullMQWrapper;
     this.logger = deps.logger;
   }
 
-  registerWorker(callback: (job: Job<PaymentJobData>) => Promise<void>): void {
-    if (this.bullMQWrapper.hasWorker(this.PAYMENT_QUEUE)) {
-      this.logger.info("Payment queue worker already registered");
+  registerBulkWorker(
+    callback: (job: Job<BulkPaymentJobData>) => Promise<void>
+  ): void {
+    if (this.bullMQWrapper.hasWorker(this.BULK_PAYMENT_QUEUE)) {
+      this.logger.debug("Bulk payment queue worker already registered");
       return;
     }
-    this.logger.info("Registering payment queue worker");
-    this.bullMQWrapper.createWorker(this.PAYMENT_QUEUE, callback, {
-      concurrency: 10, // Process up to 10 payments concurrently
+    this.logger.debug("Registering bulk payment queue worker");
+    this.bullMQWrapper.createWorker(this.BULK_PAYMENT_QUEUE, callback, {
+      concurrency: 3, // Process fewer bulk jobs concurrently since each handles multiple payments
       removeOnComplete: {
-        count: 100,
-        age: 60000, // 1 minute
+        count: 50,
+        age: 300000, // 5 minutes
       },
       removeOnFail: {
-        count: 50,
-        age: 60000, // 1 minute
+        count: 25,
+        age: 300000, // 5 minutes
       },
     });
   }
@@ -63,39 +72,86 @@ export class PaymentQueueService {
         },
       }
     );
-    this.logger.info(
+    this.logger.debug(
       { jobId: job.id, correlationId: paymentData.correlationId },
       "Payment queued for processing"
     );
     return job.id!;
   }
 
-  async scheduleRetryPayment(
-    paymentData: PaymentJobData,
-    delayMs: number
+  async queueBulkPayment(
+    payments: PaymentJobData[],
+    batchId: string,
+    preferredHost?: Host
   ): Promise<string> {
     const job = await this.bullMQWrapper.addJob(
-      this.PAYMENT_QUEUE,
-      this.RETRY_PAYMENT_JOB,
-      paymentData,
+      this.BULK_PAYMENT_QUEUE,
+      this.BULK_PAYMENT_JOB,
       {
-        delay: delayMs,
-        attempts: 2, // Fewer attempts for retries
+        payments,
+        batchId,
+        preferredHost,
+      },
+      {
+        attempts: 2,
         backoff: {
-          type: "fixed",
-          delay: 3000,
+          type: "exponential",
+          delay: 5000,
         },
       }
     );
-    this.logger.info(
+    this.logger.debug(
       {
         jobId: job.id,
-        correlationId: paymentData.correlationId,
-        delayMs,
-        retryCount: paymentData.retryCount,
+        batchId,
+        paymentCount: payments.length,
+        preferredHost,
       },
-      "Payment retry scheduled"
+      "Bulk payment batch queued for processing"
     );
     return job.id!;
+  }
+
+  async pullPendingPayments(
+    limit: number = 50
+  ): Promise<Job<PaymentJobData>[]> {
+    const queue = this.bullMQWrapper.getQueue(this.PAYMENT_QUEUE);
+    const waitingJobs = await queue.getWaiting(0, limit - 1);
+    this.logger.debug(
+      { pulledCount: waitingJobs?.length, limit },
+      "Pulled pending payments from queue"
+    );
+    return waitingJobs.filter(Boolean) ?? [];
+  }
+
+  async createBulkJobFromPendingPayments(
+    batchSize: number = 50,
+    preferredHost?: Host
+  ): Promise<string | null> {
+    const pendingJobs = await this.pullPendingPayments(batchSize);
+    if (pendingJobs.length === 0) {
+      return null;
+    }
+    // Extract payment data from jobs
+    const payments = pendingJobs.map((job) => job.data);
+    const batchId = `batch-${Date.now()}-${Math.random()
+      .toString(36)
+      .substring(2, 11)}`;
+    await Promise.all(pendingJobs.map((job) => job.remove()));
+    const bulkJobId = await this.queueBulkPayment(
+      payments,
+      batchId,
+      preferredHost
+    );
+    this.logger.debug(
+      {
+        batchId,
+        bulkJobId,
+        paymentCount: payments.length,
+        removedJobIds: pendingJobs.map((j) => j.id),
+      },
+      "Created bulk job from pending payments"
+    );
+    return bulkJobId;
   }
 }

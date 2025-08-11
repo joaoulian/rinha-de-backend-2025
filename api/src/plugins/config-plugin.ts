@@ -14,6 +14,10 @@ const environmentConfigSchema = z.object({
   PROCESSOR_DEFAULT_URL: z.string().default("http://localhost:8001"),
   PROCESSOR_FALLBACK_URL: z.string().default("http://localhost:8002"),
   REDIS_URL: z.string().default("redis://localhost:6379"),
+  // Batch processing configuration
+  BATCH_PROCESSOR_ENABLED: z.coerce.boolean().default(true),
+  BATCH_SIZE: z.coerce.number().default(550),
+  BATCH_INTERVAL_MS: z.coerce.number().default(500),
 });
 
 // Load environment variables

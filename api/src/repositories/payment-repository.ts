@@ -1,10 +1,3 @@
-export interface CreatePaymentInput {
-  correlationId: string;
-  amountInCents: number;
-  requestedAt: Date;
-  processor: "default" | "fallback";
-}
-
 export interface PaymentSummaryQuery {
   from?: Date;
   to?: Date;
@@ -28,6 +21,7 @@ export interface PaymentData {
 }
 
 export interface PaymentRepository {
-  createPayment(input: CreatePaymentInput): Promise<PaymentData>;
+  createPayment(input: PaymentData): Promise<PaymentData>;
   getPaymentSummary(query?: PaymentSummaryQuery): Promise<PaymentSummary>;
+  bulkCreatePayments(input: PaymentData[]): Promise<PaymentData[]>;
 }

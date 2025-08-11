@@ -51,8 +51,6 @@ export class BullMQWrapper {
   private buildConfig(): BullMQConfig {
     return {
       defaultJobOptions: {
-        removeOnComplete: 100,
-        removeOnFail: 50,
         attempts: 3,
         backoff: {
           type: "exponential",
@@ -60,15 +58,7 @@ export class BullMQWrapper {
         },
       },
       defaultWorkerOptions: {
-        concurrency: 5,
-        removeOnComplete: {
-          count: 100,
-          age: 60000, // 1 minute
-        },
-        removeOnFail: {
-          count: 50,
-          age: 60000, // 1 minute
-        },
+        concurrency: 50,
       },
     };
   }
@@ -109,7 +99,7 @@ export class BullMQWrapper {
         );
         try {
           const result = await handler(job);
-          this.logger.info(
+          this.logger.debug(
             { jobId: job.id, queueName },
             "Job completed successfully"
           );
@@ -127,7 +117,7 @@ export class BullMQWrapper {
     );
     this.setupWorkerEventHandlers(worker, queueName);
     this.workers.set(queueName, worker);
-    this.logger.info({ queueName }, "Worker created");
+    this.logger.debug({ queueName }, "Worker created");
     return worker;
   }
 
@@ -190,13 +180,13 @@ export class BullMQWrapper {
   async pauseQueue(queueName: string): Promise<void> {
     const queue = this.getQueue(queueName);
     await queue.pause();
-    this.logger.info({ queueName }, "Queue paused");
+    this.logger.debug({ queueName }, "Queue paused");
   }
 
   async resumeQueue(queueName: string): Promise<void> {
     const queue = this.getQueue(queueName);
     await queue.resume();
-    this.logger.info({ queueName }, "Queue resumed");
+    this.logger.debug({ queueName }, "Queue resumed");
   }
 
   async cleanQueue(
@@ -207,7 +197,7 @@ export class BullMQWrapper {
   ): Promise<string[]> {
     const queue = this.getQueue(queueName);
     const jobs = await queue.clean(grace, limit, type);
-    this.logger.info(
+    this.logger.debug(
       { queueName, cleanedCount: jobs.length, type },
       "Queue cleaned"
     );

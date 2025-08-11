@@ -1,7 +1,6 @@
 import { FastifyBaseLogger } from "fastify";
 import Redis from "ioredis";
 import {
-  CreatePaymentInput,
   PaymentData,
   PaymentRepository,
   PaymentSummary,
@@ -23,7 +22,41 @@ export class PaymentRepositoryRedisImpl implements PaymentRepository {
     this.logger = deps.logger;
   }
 
-  async createPayment(input: CreatePaymentInput): Promise<PaymentData> {
+  async bulkCreatePayments(input: PaymentData[]): Promise<PaymentData[]> {
+    if (input.length === 0) {
+      return input;
+    }
+    try {
+      const pipeline = this.redis.pipeline();
+
+      // Add all payments to the pipeline
+      for (const paymentData of input) {
+        pipeline.lpush(this.PAYMENTS_LIST_KEY, JSON.stringify(paymentData));
+      }
+      await pipeline.exec();
+      this.logger.debug(
+        {
+          count: input.length,
+          correlationIds: input.map((p) => p.correlationId),
+          processors: input.map((p) => p.processor),
+        },
+        "Bulk payments created in Redis"
+      );
+      return input;
+    } catch (error) {
+      this.logger.error(
+        {
+          error,
+          inputCount: input.length,
+          correlationIds: input.map((i) => i.correlationId),
+        },
+        "Failed to bulk create payments in Redis"
+      );
+      throw error;
+    }
+  }
+
+  async createPayment(input: PaymentData): Promise<PaymentData> {
     try {
       const paymentData: PaymentData = {
         correlationId: input.correlationId,
@@ -32,7 +65,7 @@ export class PaymentRepositoryRedisImpl implements PaymentRepository {
         processor: input.processor,
       };
       this.redis.lpush(this.PAYMENTS_LIST_KEY, JSON.stringify(paymentData));
-      this.logger.info(
+      this.logger.debug(
         { correlationId: input.correlationId, processor: input.processor },
         "Payment created in Redis"
       );

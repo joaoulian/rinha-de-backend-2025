@@ -9,6 +9,20 @@ export type ProcessPaymentInput = {
   requestedAt: Date;
 };
 
+export type BulkProcessPaymentInput = {
+  payments: ProcessPaymentInput[];
+  batchId: string;
+};
+
+export type BulkProcessPaymentResult = {
+  batchId: string;
+  processedCount: number;
+  failedPayments: {
+    correlationId: string;
+    error: string;
+  }[];
+};
+
 export type Host = "default" | "fallback";
 
 export interface PaymentProcessorGatewayDeps {
@@ -38,7 +52,7 @@ export class PaymentProcessorGateway {
     host: Host = "default"
   ): Promise<void> {
     try {
-      this.logger.info(
+      this.logger.debug(
         `Processing payment: ${JSON.stringify(input)}, host: ${host}`
       );
       const response = await axios.post<ProcessPaymentInput>(
@@ -54,12 +68,58 @@ export class PaymentProcessorGateway {
       }
       return;
     } catch (e: any) {
-      this.logger.error(
+      this.logger.debug(
         { error: e.message },
         `Error in ${host} payment processor`
       );
       throw e;
     }
+  }
+
+  async processBulkPayments(
+    input: BulkProcessPaymentInput,
+    host: Host
+  ): Promise<BulkProcessPaymentResult> {
+    const results: BulkProcessPaymentResult = {
+      batchId: input.batchId,
+      processedCount: 0,
+      failedPayments: [],
+    };
+    // Process payments in parallel with controlled concurrency
+    const concurrencyLimit = 10;
+    const chunks = this.chunkArray(input.payments, concurrencyLimit);
+    for (const chunk of chunks) {
+      const promises = chunk.map(async (payment) => {
+        try {
+          await this.processPayment(payment, host);
+          results.processedCount++;
+        } catch (error: any) {
+          results.failedPayments.push({
+            correlationId: payment.correlationId,
+            error: error.message,
+          });
+        }
+      });
+      await Promise.all(promises);
+    }
+    this.logger.debug(
+      {
+        batchId: input.batchId,
+        processedCount: results.processedCount,
+        failedCount: results.failedPayments.length,
+        host,
+      },
+      "Individual bulk payment processing completed"
+    );
+    return results;
+  }
+
+  private chunkArray<T>(array: T[], chunkSize: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+      chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
   }
 
   async quickCheckIsHealthy(host: Host = "default"): Promise<boolean> {

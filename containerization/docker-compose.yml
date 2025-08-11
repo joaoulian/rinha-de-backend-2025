@@ -1,6 +1,3 @@
-# Docker Compose para produção usando imagens do Docker Hub
-# Para desenvolvimento local, use docker-compose.dev.yml
-
 services:
   api1: &api
     image: joaoulian/rinha-backend-2025-api:latest
@@ -20,13 +17,13 @@ services:
       resources:
         limits:
           cpus: "0.3"
-          memory: "65MB"
+          memory: "55MB"
 
   api2:
     <<: *api
     hostname: api2
 
-  worker1:
+  worker1: &worker
     image: joaoulian/rinha-backend-2025-api:latest
     command: node dist/worker.js
     hostname: worker1
@@ -44,8 +41,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: "100MB"
+          cpus: "1.0"
+          memory: "140MB"
 
   cache:
     image: redis:7-alpine
@@ -60,7 +57,7 @@ services:
       resources:
         limits:
           cpus: "0.3"
-          memory: "100MB"
+          memory: "80MB"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -84,7 +81,7 @@ services:
       resources:
         limits:
           cpus: "0.3"
-          memory: "30MB"
+          memory: "20MB"
 
 volumes:
   redis_data:

@@ -70,10 +70,10 @@ export class Instrumentation<Request extends Record<string, any>>
   }
 
   logStarted(): void {
-    this.logInfo("Service started");
+    this.logDebug("Service started");
   }
 
   logEnded(): void {
-    this.logInfo("Service ended");
+    this.logDebug("Service ended");
   }
 }

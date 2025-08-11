@@ -109,7 +109,7 @@ export class HostHealthCacheService {
 
       if (keys.length > 0) {
         await this.redis.del(...keys);
-        this.logger.info(
+        this.logger.debug(
           { deletedKeys: keys.length },
           "Cleared all cached health data"
         );
