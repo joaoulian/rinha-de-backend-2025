@@ -4,7 +4,6 @@ import type { PaymentQueueService } from "./payment-queue.service";
 export interface BatchProcessorConfig {
   batchSize: number;
   intervalMs: number;
-  enabled: boolean;
 }
 
 export interface BatchProcessorServiceDeps {
@@ -28,10 +27,6 @@ export class BatchProcessorService {
   }
 
   start(): void {
-    if (!this.config.enabled) {
-      this.logger.debug("Batch processor is disabled");
-      return;
-    }
     if (this.isRunning) {
       this.logger.warn("Batch processor is already running");
       return;

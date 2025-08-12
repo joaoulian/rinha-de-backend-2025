@@ -15,9 +15,10 @@ Intermediador de pagamentos desenvolvido para a [Rinha de Backend 2025](https://
 O projeto segue uma arquitetura com:
 
 - **API Principal**: Duas instâncias para alta disponibilidade
-- **Worker**: Processamento assíncrono de pagamentos
-- **Load Balancer**: Nginx para distribuição de carga
-- **Cache**: Redis para otimização de performance
+- **Worker**: Processamento assíncrono de pagamentos em lote (até 550 por batch)
+- **Batch Processor**: Sistema de polling que agrupa pagamentos individuais em lotes
+- **Load Balancer**: HAProxy para distribuição de carga
+- **Cache**: Redis para otimização de performance e filas
 - **Processadores de Pagamento**: Serviços externos simulando processadores de pagamentos
   <img width="965" height="532" alt="image" src="https://github.com/user-attachments/assets/e5e41933-b19f-440c-9492-50eb883ed177" />
 
@@ -69,6 +70,10 @@ pnpm install
 # Configurar variáveis de ambiente
 cp .env.example .env
 
+# Principais variáveis de configuração do processamento em lote:
+# BATCH_SIZE=550                  # Tamanho máximo do lote
+# BATCH_INTERVAL_MS=500          # Intervalo de polling em ms
+
 # Iniciar em modo de desenvolvimento
 pnpm dev
 
@@ -105,7 +110,7 @@ pnpm format
 ├── containerization/             # Configuração Docker
 │   ├── docker-compose.yml        # Orquestração principal
 │   ├── docker-compose-payment-processors.yml
-│   └── nginx.conf                # Configuração do Nginx
+│   └── haproxy.cfg              # Configuração do load balancer
 └── README.md                     # Documentação
 ```
 
@@ -128,17 +133,24 @@ pnpm format
 
 ## 🔄 Fluxo de Pagamentos
 
-1. **Recebimento**: API recebe solicitação de pagamento
+1. **Recebimento**: API recebe solicitação de pagamento individual
 2. **Validação**: Dados são validados com Zod
-3. **Persistência**: Pagamento é salvo no Redis
-4. **Enfileiramento**: Pagamento é adicionado à fila Redis
-5. **Processamento**: Worker processa o pagamento assincronamente
-6. **Integração**: Chamada para processadores externos
-7. **Atualização**: Status do pagamento é atualizado
+3. **Enfileiramento Individual**: Pagamento é adicionado à fila individual Redis
+4. **Polling Automático**: Batch Processor verifica fila a cada 500ms
+5. **Agrupamento**: Até 550 pagamentos são agrupados em um lote
+6. **Processamento em Lote**: Worker processa o lote assincronamente
+7. **Integração Paralela**: Chamadas simultâneas para processadores externos (chunks de 10)
+8. **Persistência em Lote**: Resultados são salvos usando pipeline Redis
+9. **Retry Inteligente**: Pagamentos falhados são reagrupados com host alternativo
 
-## 🔄 Estratégia de Retry e Failover
+## 🔄 Estratégia de Processamento em Lote e Polling
 
-O sistema implementa uma estratégia robusta de retry e failover para garantir alta disponibilidade no processamento de pagamentos:
+O sistema implementa uma arquitetura otimizada de processamento em lote com polling para maximizar throughput e eficiência:
+
+### Configuração do Processamento em Lote
+
+- **BATCH_SIZE**: 550 pagamentos por lote (configurável via env)
+- **BATCH_INTERVAL_MS**: 500ms entre verificações de lote (configurável via env)
 
 ### Cache de Status dos Processadores (Redis)
 
@@ -155,37 +167,25 @@ O sistema implementa uma estratégia robusta de retry e failover para garantir a
 3. **Fallback Automático**: Usa processador de fallback se o padrão falhar
 4. **Cache Otimizado**: Evita consultas desnecessárias usando Redis
 
-### Estratégia de Retry em Múltiplas Camadas
-
-#### Camada 1: BullMQ (Retry Imediato)
-
-- **Tentativas**: Configurável por job
-- **Backoff**: Estratégia exponencial
-- **Mesmo Host**: Mantém o processador original
-
-#### Camada 2: Troca de Processador (Retry Inteligente)
-
-- **Ativação**: Após esgotar tentativas do BullMQ
-- **Troca de Host**: Alterna entre default ↔ fallback
-- **Delay Inteligente**: Aguarda `minResponseTime` do novo processador
-- **Requeue**: Adiciona novo job na fila com prioridade mantida
-
-### Fluxo de Retry Detalhado
+### Fluxo Detalhado do Sistema
 
 ```
-Pagamento Falha
-       ↓
-BullMQ Retry (mesmo host)
-       ↓
-Tentativas Esgotadas?
-       ↓
-Consulta Saúde do Outro Host
-       ↓
-Agenda Retry com Novo Host
-       ↓
-Delay = minResponseTime
-       ↓
-Nova Tentativa de Processamento
+Pagamentos Individuais
+         ↓
+   Fila Individual
+         ↓
+Batch Processor (500ms polling)
+         ↓
+   Agrupa em Lotes (550)
+         ↓
+  Processamento Paralelo
+    (chunks de 10)
+         ↓
+   Falhas no Lote?
+         ↓
+Retry com Host Alternativo
+         ↓
+ Persistência em Pipeline
 ```
 
 ## � Imagens Docker Hub

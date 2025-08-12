@@ -49,9 +49,7 @@ const diContainerPlugin: FastifyPluginAsync = async (
   const batchProcessorConfig = {
     batchSize: fastify.appConfig.BATCH_SIZE,
     intervalMs: fastify.appConfig.BATCH_INTERVAL_MS,
-    enabled: fastify.appConfig.BATCH_PROCESSOR_ENABLED,
   };
-
   diContainer.register({
     appConfig: asValue(fastify.appConfig),
     logger: asValue(fastify.log),
