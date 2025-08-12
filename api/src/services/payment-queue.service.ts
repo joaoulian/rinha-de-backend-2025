@@ -15,6 +15,7 @@ export interface BulkPaymentJobData {
   payments: PaymentJobData[];
   batchId: string;
   preferredHost?: Host;
+  retryCount?: number;
 }
 
 export interface PaymentQueueServiceDeps {
@@ -82,7 +83,9 @@ export class PaymentQueueService {
   async queueBulkPayment(
     payments: PaymentJobData[],
     batchId: string,
-    preferredHost?: Host
+    preferredHost?: Host,
+    delay?: number,
+    retryCount?: number
   ): Promise<string> {
     const job = await this.bullMQWrapper.addJob(
       this.BULK_PAYMENT_QUEUE,
@@ -91,8 +94,10 @@ export class PaymentQueueService {
         payments,
         batchId,
         preferredHost,
+        retryCount,
       },
       {
+        delay,
         attempts: 2,
         backoff: {
           type: "exponential",

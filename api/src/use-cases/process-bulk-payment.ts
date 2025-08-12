@@ -51,7 +51,7 @@ export class ProcessBulkPayment extends UseCase<
       `Processing bulk payment job ${job.id} with batchId ${batchId} containing ${payments.length} payments`
     );
 
-    const { host, result } = await this.processBulkPayments(
+    const { result } = await this.processBulkPayments(
       instrumentation,
       job,
       preferredHost
@@ -62,7 +62,7 @@ export class ProcessBulkPayment extends UseCase<
       instrumentation,
       payments,
       result.failedPayments,
-      host
+      preferredHost
     );
 
     if (result.failedPayments.length > 0) {
@@ -70,7 +70,8 @@ export class ProcessBulkPayment extends UseCase<
         instrumentation,
         payments,
         result.failedPayments,
-        host
+        preferredHost,
+        job.data.retryCount
       );
     }
 
@@ -79,7 +80,7 @@ export class ProcessBulkPayment extends UseCase<
       {
         jobId: job.id,
         batchId,
-        host,
+        preferredHost,
         processedCount: result.processedCount,
         failedCount: result.failedPayments.length,
       }
@@ -91,7 +92,6 @@ export class ProcessBulkPayment extends UseCase<
     job: ProcessBulkPaymentRequest,
     preferredHost: Host
   ): Promise<{
-    host: Host;
     result: {
       batchId: string;
       processedCount: number;
@@ -99,14 +99,6 @@ export class ProcessBulkPayment extends UseCase<
     };
   }> {
     const { payments, batchId } = job.data;
-
-    // Check host health and determine which host to use
-    const health = await this.paymentProcessorGateway.checkHealth(
-      preferredHost
-    );
-    const host = !health.failing
-      ? preferredHost
-      : ((preferredHost === "default" ? "fallback" : "default") as Host);
     const bulkInput: BulkProcessPaymentInput = {
       batchId,
       payments: payments.map((payment) => ({
@@ -115,22 +107,18 @@ export class ProcessBulkPayment extends UseCase<
         requestedAt: new Date(payment.requestedAt),
       })),
     };
-
     const result = await this.paymentProcessorGateway.processBulkPayments(
       bulkInput,
-      host
+      preferredHost
     );
-
     instrumentation.logDebug("Bulk payment processed successfully", {
       jobId: job.id,
       batchId,
-      host,
+      host: preferredHost,
       processedCount: result.processedCount,
       failedCount: result.failedPayments.length,
     });
-
     return {
-      host,
       result,
     };
   }
@@ -175,7 +163,8 @@ export class ProcessBulkPayment extends UseCase<
     instrumentation: IInstrumentation,
     allPayments: BulkPaymentJobData["payments"],
     failedPayments: { correlationId: string; error: string }[],
-    currentHost: Host
+    currentHost: Host,
+    retryCount: number = 0
   ): Promise<void> {
     instrumentation.logInfo(
       `Re-queuing ${failedPayments.length} failed payments for individual retry`
@@ -187,11 +176,14 @@ export class ProcessBulkPayment extends UseCase<
     const batchId = `retry-batch-${Date.now()}-${Math.random()
       .toString(36)
       .substring(2, 11)}`;
-    const otherHost = currentHost === "default" ? "fallback" : "default";
+    const selectedHost =
+      currentHost === "default" && retryCount < 3 ? currentHost : "fallback";
     await this.paymentQueueService.queueBulkPayment(
       failedPaymentData,
       batchId,
-      otherHost
+      selectedHost,
+      selectedHost === currentHost ? 500 : undefined,
+      retryCount + 1
     );
   }
 }
