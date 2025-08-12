@@ -1,5 +1,10 @@
 # Rinha de Backend 2025 💸
 
+[![pt-br](https://img.shields.io/badge/lang-pt--br-green.svg)](https://github.com/joaoulian/rinha-de-backend-2025/blob/main/README.md)
+[![en](https://img.shields.io/badge/lang-en-red.svg)](https://github.com/joaoulian/rinha-de-backend-2025/blob/main/README-en.md)
+
+---
+
 Intermediador de pagamentos desenvolvido para a [Rinha de Backend 2025](https://github.com/zanfranceschi/rinha-de-backend-2025), utilizando Node.js, TypeScript e Redis.
 
 ## 🚀 Tecnologias Utilizadas
