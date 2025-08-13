@@ -28,12 +28,21 @@ export class PaymentRepositoryRedisImpl implements PaymentRepository {
     }
     try {
       const pipeline = this.redis.pipeline();
-
-      // Add all payments to the pipeline
-      for (const paymentData of input) {
-        pipeline.lpush(this.PAYMENTS_LIST_KEY, JSON.stringify(paymentData));
+      const serializedPayments = input.map((paymentData) =>
+        JSON.stringify(paymentData)
+      );
+      if (serializedPayments.length > 0) {
+        pipeline.rpush(this.PAYMENTS_LIST_KEY, ...serializedPayments);
       }
-      await pipeline.exec();
+      const results = await pipeline.exec();
+      if (results && results.some(([err]) => err)) {
+        const errors = results.filter(([err]) => err).map(([err]) => err);
+        throw new Error(
+          `Pipeline execution failed: ${errors
+            .map((e) => e?.message)
+            .join(", ")}`
+        );
+      }
       this.logger.debug(
         {
           count: input.length,

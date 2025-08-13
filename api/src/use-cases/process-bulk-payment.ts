@@ -45,36 +45,39 @@ export class ProcessBulkPayment extends UseCase<
     instrumentation: IInstrumentation,
     job: ProcessBulkPaymentRequest
   ): Promise<ProcessBulkPaymentResponse> {
-    const { payments, batchId, preferredHost = "default" } = job.data;
-
+    const {
+      payments,
+      batchId,
+      preferredHost = "default",
+      retryCount,
+    } = job.data;
     instrumentation.logInfo(
-      `Processing bulk payment job ${job.id} with batchId ${batchId} containing ${payments.length} payments`
+      `Processing bulk payment job ${job.id} with batchId ${batchId} containing ${payments.length} payments. Host: ${preferredHost}`
     );
-
     const { result } = await this.processBulkPayments(
       instrumentation,
       job,
       preferredHost
     );
-
-    // Save successful payments to database
-    await this.saveSuccessfulPayments(
-      instrumentation,
-      payments,
-      result.failedPayments,
-      preferredHost
-    );
-
-    if (result.failedPayments.length > 0) {
-      await this.requeueFailedPaymentsFromResult(
+    await Promise.all([
+      this.saveSuccessfulPayments(
         instrumentation,
         payments,
         result.failedPayments,
-        preferredHost,
-        job.data.retryCount
-      );
-    }
-
+        preferredHost
+      ),
+      ...(result.failedPayments.length > 0
+        ? [
+            this.requeueFailedPaymentsFromResult(
+              instrumentation,
+              payments,
+              result.failedPayments,
+              preferredHost,
+              retryCount
+            ),
+          ]
+        : []),
+    ]);
     instrumentation.logDebug(
       `Bulk payment processing completed: ${result.processedCount} successful, ${result.failedPayments.length} failed`,
       {
@@ -135,20 +138,16 @@ export class ProcessBulkPayment extends UseCase<
     const successfulPayments = allPayments.filter(
       (payment) => !failedCorrelationIds.has(payment.correlationId)
     );
-
     if (successfulPayments.length === 0) {
       instrumentation.logDebug("No successful payments to save");
       return;
     }
-
-    // Use bulk create for better performance
     const paymentInputs = successfulPayments.map((payment) => ({
       correlationId: payment.correlationId,
       amountInCents: Cents.fromFloat(payment.amount).value,
       requestedAt: new Date(payment.requestedAt),
       processor: host,
     }));
-
     await this.paymentRepository.bulkCreatePayments(paymentInputs);
     instrumentation.logDebug(
       `Saved ${successfulPayments.length} successful payments to database`,
@@ -176,14 +175,42 @@ export class ProcessBulkPayment extends UseCase<
     const batchId = `retry-batch-${Date.now()}-${Math.random()
       .toString(36)
       .substring(2, 11)}`;
-    const selectedHost =
-      currentHost === "default" && retryCount < 3 ? currentHost : "fallback";
+    const {
+      host: selectedHost,
+      delay,
+      retryCount: newRetryCount,
+    } = this.selectHostWhenFailed(currentHost, retryCount);
     await this.paymentQueueService.queueBulkPayment(
       failedPaymentData,
       batchId,
       selectedHost,
-      selectedHost === currentHost ? 500 : undefined,
-      retryCount + 1
+      delay,
+      newRetryCount
     );
+  }
+
+  private selectHostWhenFailed(
+    currentHost: Host,
+    retryCount: number
+  ): { host: Host; delay: number; retryCount: number } {
+    if (currentHost === "default") {
+      if (retryCount < 5) {
+        return {
+          host: "default",
+          delay: 300 * (retryCount + 1),
+          retryCount: retryCount + 1,
+        };
+      }
+      return {
+        host: "fallback",
+        delay: 0,
+        retryCount: 0,
+      };
+    }
+    return {
+      host: "default",
+      delay: 300,
+      retryCount: 0,
+    };
   }
 }

@@ -13,6 +13,10 @@ const redisPlugin: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   const redis = new Redis(fastify.appConfig.REDIS_URL, {
     maxRetriesPerRequest: null,
     lazyConnect: true,
+    enableReadyCheck: false,
+    family: 4,
+    enableAutoPipelining: false,
+    stringNumbers: false,
   });
   // Setup Redis event handlers
   redis.on("connect", () => {
